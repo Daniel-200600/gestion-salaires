@@ -1,0 +1,316 @@
+"""
+Page Streamlit — Module 02 : Gestion des enseignants.
+
+Règle d'architecture stricte : cette page ne contient AUCUNE requête
+SQL. Elle appelle exclusivement les fonctions de services.enseignant_service,
+qui portent toute la logique de validation et d'orchestration.
+"""
+
+import sys
+from pathlib import Path
+
+# Garantit que la racine du projet est importable, quelle que soit la
+# façon dont Streamlit est lancé (streamlit run pages/1_Enseignants.py
+# ou via un futur app.py multipage).
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+
+import streamlit as st
+
+from database.initialization import init_database
+from services.enseignant_service import (
+    MESSAGE_BULLETIN_EXISTANT,
+    EnseignantValidationError,
+    creer_enseignant,
+    desactiver_enseignant,
+    lister_enseignants,
+    modifier_enseignant,
+    obtenir_dependances_enseignant,
+    obtenir_enseignant,
+    reactiver_enseignant,
+    rechercher_enseignants,
+)
+from utils.formatters import (
+    OPTIONS_SEXE,
+    OPTIONS_STATUT,
+    formater_fcfa,
+    libelle_actif,
+    libelle_sexe,
+    libelle_statut,
+    sexe_depuis_libelle,
+    statut_depuis_libelle,
+)
+
+# Idempotent : garantit que les tables existent dès le premier lancement.
+init_database()
+
+
+from services import permission_service
+from services import administration_service
+from services.autorisation_service import AutorisationRefuseeError
+from utils.session_auth import exiger_permission, utilisateur_courant_id, utilisateur_courant_role
+
+exiger_permission(permission_service.ENSEIGNANT_CONSULTER)
+
+st.title("Gestion des enseignants")
+
+# =======================================================================
+# Zone 1 — Ajouter un enseignant
+# =======================================================================
+with st.expander("Ajouter un enseignant", expanded=False):
+    with st.form("form_ajout_enseignant", clear_on_submit=True):
+        col_gauche, col_droite = st.columns(2)
+
+        with col_gauche:
+            nom = st.text_input("Nom *")
+            sexe_libelle = st.selectbox("Sexe *", OPTIONS_SEXE)
+            taux_horaire = st.number_input(
+                "Taux horaire (FCFA) *", min_value=0, step=100, format="%d"
+            )
+            email = st.text_input("Email")
+
+        with col_droite:
+            prenom = st.text_input("Prénom(s) *")
+            statut_libelle = st.selectbox("Statut *", OPTIONS_STATUT)
+            telephone = st.text_input("Téléphone")
+            adresse = st.text_input("Adresse")
+
+        soumis = st.form_submit_button("Enregistrer l'enseignant")
+
+        if soumis:
+            try:
+                nouvel_enseignant = creer_enseignant(
+                    nom=nom,
+                    prenom=prenom,
+                    sexe=sexe_depuis_libelle(sexe_libelle),
+                    statut=statut_depuis_libelle(statut_libelle),
+                    taux_horaire=taux_horaire,
+                    email=email,
+                    telephone=telephone,
+                    adresse=adresse,
+                )
+                st.success(
+                    f"Enseignant « {nouvel_enseignant.prenom} {nouvel_enseignant.nom} » ajouté avec succès."
+                )
+                st.rerun()
+            except EnseignantValidationError as erreur:
+                st.error(str(erreur))
+
+st.divider()
+
+# =======================================================================
+# Zone 2 — Liste des enseignants (recherche + filtre)
+# =======================================================================
+st.subheader("Liste des enseignants")
+
+col_recherche, col_filtre = st.columns([3, 1])
+with col_recherche:
+    terme_recherche = st.text_input(
+        "Rechercher (nom, prénom ou nom complet)", key="champ_recherche_enseignant"
+    )
+with col_filtre:
+    inclure_inactifs = st.checkbox("Inclure les enseignants désactivés", value=False)
+
+if terme_recherche:
+    enseignants = rechercher_enseignants(terme_recherche, inclure_inactifs=inclure_inactifs)
+else:
+    enseignants = lister_enseignants(inclure_inactifs=inclure_inactifs)
+
+if not enseignants:
+    st.info("Aucune donnée disponible. Aucun enseignant ne correspond aux critères affichés.")
+else:
+    lignes_tableau = [
+        {
+            "ID": enseignant.id,
+            "Nom": enseignant.nom,
+            "Prénom": enseignant.prenom,
+            "Sexe": libelle_sexe(enseignant.sexe),
+            "Statut": libelle_statut(enseignant.statut),
+            "Taux horaire (FCFA)": enseignant.taux_horaire,
+            "État": libelle_actif(enseignant.actif),
+        }
+        for enseignant in enseignants
+    ]
+    st.dataframe(lignes_tableau, use_container_width=True, hide_index=True)
+    st.caption(f"{len(enseignants)} enseignant(s) affiché(s).")
+
+st.divider()
+
+# =======================================================================
+# Zone 3 — Actions : consulter / modifier / désactiver / réactiver
+# =======================================================================
+st.subheader("Actions sur un enseignant")
+
+if not enseignants:
+    st.info("Aucun enseignant disponible pour les actions.")
+else:
+    options_enseignants = {
+        f"{enseignant.prenom} {enseignant.nom} (id {enseignant.id})": enseignant.id
+        for enseignant in enseignants
+    }
+    choix_libelle = st.selectbox("Sélectionner un enseignant", list(options_enseignants.keys()))
+    enseignant_id = options_enseignants[choix_libelle]
+    enseignant_selectionne = obtenir_enseignant(enseignant_id)
+
+    onglet_fiche, onglet_modifier, onglet_etat, onglet_suppression = st.tabs(
+        ["Fiche détaillée", "Modifier", "Activer / Désactiver", "Supprimer définitivement"]
+    )
+
+    # --- Fiche détaillée -----------------------------------------------
+    with onglet_fiche:
+        col_a, col_b = st.columns(2)
+        with col_a:
+            st.write(f"**Nom :** {enseignant_selectionne.nom}")
+            st.write(f"**Prénom :** {enseignant_selectionne.prenom}")
+            st.write(f"**Sexe :** {libelle_sexe(enseignant_selectionne.sexe)}")
+            st.write(f"**Statut :** {libelle_statut(enseignant_selectionne.statut)}")
+            st.write(f"**Taux horaire :** {formater_fcfa(enseignant_selectionne.taux_horaire)}")
+        with col_b:
+            st.write(f"**Email :** {enseignant_selectionne.email or '—'}")
+            st.write(f"**Téléphone :** {enseignant_selectionne.telephone or '—'}")
+            st.write(f"**Adresse :** {enseignant_selectionne.adresse or '—'}")
+            st.write(f"**État :** {libelle_actif(enseignant_selectionne.actif)}")
+        st.caption(
+            f"Créé le {enseignant_selectionne.date_creation} · "
+            f"Dernière modification le {enseignant_selectionne.date_modification}"
+        )
+
+    # --- Modifier ---------------------------------------------------
+    with onglet_modifier:
+        peut_modifier_enseignant = permission_service.a_permission(
+            utilisateur_courant_role(), permission_service.ENSEIGNANT_MODIFIER
+        )
+        if not peut_modifier_enseignant:
+            st.info("Vous n'avez pas la permission de modifier les enseignants (consultation seule).")
+        with st.form(f"form_modifier_{enseignant_id}"):
+            col_gauche, col_droite = st.columns(2)
+
+            with col_gauche:
+                nom_modifie = st.text_input("Nom *", value=enseignant_selectionne.nom)
+                sexe_modifie_libelle = st.selectbox(
+                    "Sexe *",
+                    OPTIONS_SEXE,
+                    index=OPTIONS_SEXE.index(libelle_sexe(enseignant_selectionne.sexe)),
+                )
+                taux_modifie = st.number_input(
+                    "Taux horaire (FCFA) *",
+                    min_value=0,
+                    step=100,
+                    format="%d",
+                    value=int(enseignant_selectionne.taux_horaire),
+                )
+                email_modifie = st.text_input("Email", value=enseignant_selectionne.email or "")
+
+            with col_droite:
+                prenom_modifie = st.text_input("Prénom(s) *", value=enseignant_selectionne.prenom)
+                statut_modifie_libelle = st.selectbox(
+                    "Statut *",
+                    OPTIONS_STATUT,
+                    index=OPTIONS_STATUT.index(
+                        libelle_statut(enseignant_selectionne.statut)
+                    ),
+                )
+                telephone_modifie = st.text_input("Téléphone", value=enseignant_selectionne.telephone or "")
+                adresse_modifiee = st.text_input("Adresse", value=enseignant_selectionne.adresse or "")
+
+            soumis_modification = st.form_submit_button(
+                "Enregistrer les modifications", disabled=not peut_modifier_enseignant
+            )
+
+            if soumis_modification and peut_modifier_enseignant:
+                try:
+                    modifier_enseignant(
+                        enseignant_id=enseignant_id,
+                        nom=nom_modifie,
+                        prenom=prenom_modifie,
+                        sexe=sexe_depuis_libelle(sexe_modifie_libelle),
+                        statut=statut_depuis_libelle(statut_modifie_libelle),
+                        taux_horaire=taux_modifie,
+                        email=email_modifie,
+                        telephone=telephone_modifie,
+                        adresse=adresse_modifiee,
+                    )
+                    st.success("Enseignant modifié avec succès.")
+                    st.rerun()
+                except EnseignantValidationError as erreur:
+                    st.error(str(erreur))
+
+    # --- Activer / Désactiver ---------------------------------------
+    with onglet_etat:
+        if enseignant_selectionne.actif:
+            st.warning("Cet enseignant est actuellement **actif**.")
+            if st.button("Désactiver cet enseignant"):
+                desactiver_enseignant(enseignant_id)
+                st.success("Enseignant désactivé. Il reste consultable dans l'historique.")
+                st.rerun()
+        else:
+            st.warning("Cet enseignant est actuellement **inactif**.")
+            if st.button("Réactiver cet enseignant"):
+                reactiver_enseignant(enseignant_id)
+                st.success("Enseignant réactivé.")
+                st.rerun()
+
+    # --- Supprimer définitivement (irréversible) ---------------------
+    with onglet_suppression:
+        if not permission_service.a_permission(utilisateur_courant_role(), permission_service.ENSEIGNANT_SUPPRIMER):
+            st.info("La suppression définitive est réservée aux administrateurs.")
+            st.stop()
+        nom_complet = f"{enseignant_selectionne.nom} {enseignant_selectionne.prenom}"
+        st.write(f"**Nom :** {enseignant_selectionne.nom}")
+        st.write(f"**Prénom :** {enseignant_selectionne.prenom}")
+        st.write(f"**Statut :** {libelle_statut(enseignant_selectionne.statut)}")
+
+        dependances = obtenir_dependances_enseignant(enseignant_id)
+        st.markdown(
+            f"- {dependances.nombre_heures} semaine(s) d'heures enregistrée(s)\n"
+            f"- {dependances.nombre_elements_remuneration} élément(s) de rémunération\n"
+            f"- {dependances.nombre_retenues} retenue(s)\n"
+            f"- {'Oui' if dependances.a_des_bulletins else 'Aucun'} bulletin généré"
+        )
+
+        cle_confirmation = f"confirmation_suppression_{enseignant_id}"
+
+        if dependances.a_des_bulletins:
+            # CAS 3 : la règle ne peut jamais être contournée depuis
+            # l'interface — aucun bouton de suppression n'est même affiché.
+            st.error(MESSAGE_BULLETIN_EXISTANT)
+        else:
+            if dependances.a_des_donnees_de_paie:
+                st.warning(
+                    "Cet enseignant possède des données de paie sans bulletin généré. "
+                    "Elles seront supprimées avec lui."
+                )
+
+            if not st.session_state.get(cle_confirmation, False):
+                if st.button("Supprimer définitivement", type="primary"):
+                    st.session_state[cle_confirmation] = True
+                    st.rerun()
+            else:
+                st.error(
+                    "ATTENTION — Cette opération est **définitive et irréversible**.\n\n"
+                    f"Enseignant : **{nom_complet}**"
+                )
+                saisie_confirmation = st.text_input(
+                    f"Tapez **{nom_complet}** pour confirmer la suppression définitive",
+                    key=f"saisie_confirmation_{enseignant_id}",
+                )
+                col_confirmer, col_annuler = st.columns(2)
+                with col_confirmer:
+                    confirmation_valide = saisie_confirmation.strip() == nom_complet
+                    if st.button("Confirmer la suppression", type="primary", disabled=not confirmation_valide):
+                        try:
+                            # Droits revérifiés en base par le service (ADMIN uniquement).
+                            administration_service.supprimer_enseignant(
+                                utilisateur_courant_id(), enseignant_id, confirmation=True
+                            )
+                            st.session_state.pop(cle_confirmation, None)
+                            st.success(f"{nom_complet} a été supprimé définitivement.")
+                            st.rerun()
+                        except (EnseignantValidationError, AutorisationRefuseeError) as erreur:
+                            st.session_state.pop(cle_confirmation, None)
+                            st.error(str(erreur))
+                    if saisie_confirmation and not confirmation_valide:
+                        st.caption("Le texte saisi ne correspond pas exactement au nom demandé.")
+                with col_annuler:
+                    if st.button("Annuler"):
+                        st.session_state.pop(cle_confirmation, None)
+                        st.rerun()

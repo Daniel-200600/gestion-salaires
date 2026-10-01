@@ -1,0 +1,38 @@
+# Configuration Streamlit de l'application « Gestion des Salaires ».
+#
+# Identité visuelle sobre et institutionnelle : fond blanc, gris neutres,
+# bleu profond (couleur du logo) pour les éléments interactifs, couleurs
+# fonctionnelles réservées aux états (succès, avertissement, erreur).
+# Formes à angles faiblement arrondis : aucun bouton en forme de pilule.
+# Tous les couples texte/fond ci-dessous dépassent un contraste de 4,5:1
+# (vérifié par tests/test_interface_professionnelle.py).
+
+[theme]
+base = "light"
+primaryColor = "#1F3A6E"
+backgroundColor = "#FFFFFF"
+secondaryBackgroundColor = "#F3F5F8"
+textColor = "#1F2A37"
+borderColor = "#D5DBE3"
+showWidgetBorder = true
+linkColor = "#1F3A6E"
+linkUnderline = true
+font = "sans-serif"
+baseRadius = "4px"
+buttonRadius = "4px"
+headingFontWeights = [650, 600, 600, 600, 600, 600]
+headingFontSizes = ["2rem", "1.5rem", "1.25rem", "1.1rem", "1rem", "1rem"]
+dataframeHeaderBackgroundColor = "#EEF2F7"
+
+[theme.sidebar]
+backgroundColor = "#F3F5F8"
+borderColor = "#D5DBE3"
+
+[client]
+# Masque le bouton « Deploy » et les options de développement.
+toolbarMode = "viewer"
+# Aucun lien externe (moteur de recherche, assistant) sous les messages d'erreur.
+showErrorLinks = false
+
+[browser]
+gatherUsageStats = false

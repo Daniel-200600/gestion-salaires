@@ -1,0 +1,30 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+env/
+.pytest_cache/
+
+# Packaging
+build/
+dist/
+*.exe
+
+# Runtime data written by the application (real payroll data -- never commit)
+data/*.db
+data/*.db-*
+data/*.sqlite*
+exports/output/
+backups/
+archives/
+*.backup_*
+
+# Logs, local configuration, secrets
+*.log
+logs/
+.env
+.env.*
+*.pem
+*.key
+.streamlit/secrets.toml
