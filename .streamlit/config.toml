@@ -36,3 +36,8 @@ showErrorLinks = false
 
 [browser]
 gatherUsageStats = false
+
+[server]
+# L'application n'écoute que sur cet ordinateur : elle n'est pas joignable
+# depuis le réseau (Wi-Fi de l'établissement, etc.).
+address = "127.0.0.1"

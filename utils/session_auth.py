@@ -14,6 +14,8 @@ contentent d'appeler ces deux fonctions, jamais de vérifier `role`
 elles-mêmes.
 """
 
+import os
+import threading
 import time
 from typing import Optional
 
@@ -112,6 +114,24 @@ def deconnexion() -> None:
     _purger_session()
 
 
+def arreter_application() -> None:
+    """
+    Arrête le serveur de l'application (bouton « Quitter l'application »).
+    Sans cela, fermer le navigateur laisse le programme tourner en
+    arrière-plan. L'arrêt est différé d'une seconde pour que le message
+    de confirmation ait le temps de s'afficher.
+    """
+    threading.Timer(1.0, os._exit, args=(0,)).start()
+
+
+def _bouton_quitter(cle: str) -> None:
+    if st.button("Quitter l'application", icon=":material/power_settings_new:", key=cle):
+        deconnexion()
+        st.info("L'application est arrêtée. Vous pouvez fermer cet onglet du navigateur.")
+        arreter_application()
+        st.stop()
+
+
 def _afficher_formulaire_initialisation_admin() -> None:
     """
     Affiché uniquement lorsqu'AUCUN utilisateur n'existe encore en
@@ -175,6 +195,7 @@ def _afficher_formulaire_connexion() -> None:
     if st.button("Retour à la présentation"):
         st.session_state[_CLE_BIENVENUE_VUE] = False
         st.rerun()
+    _bouton_quitter("quitter_connexion")
     st.stop()
 
 
@@ -310,5 +331,6 @@ def afficher_bandeau_utilisateur() -> None:
         if st.button("Se déconnecter", icon=":material/logout:"):
             deconnexion()
             st.rerun()
+        _bouton_quitter("quitter_barre_laterale")
         st.divider()
         st.caption(f"{NOM_APPLICATION} — version {VERSION}")
