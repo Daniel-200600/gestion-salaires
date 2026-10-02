@@ -63,7 +63,11 @@ def test_configuration_streamlit_de_production():
 def test_executable_embarque_favicon_documentation_et_configuration():
     spec = (RACINE / "GestionPaie.spec").read_text(encoding="utf-8")
     assert 'icon=str(RACINE / "assets" / "favicon.ico")' in spec
-    assert '(str(RACINE / "assets"), "assets")' in spec
+    for image in ("favicon.png", "favicon.ico", "logo_horizontal.png", "logo_symbole.png"):
+        assert f'"{image}"' in spec
+    # Le logo d'un établissement n'est jamais embarqué dans l'exécutable.
+    lignes_de_code = [l for l in spec.splitlines() if not l.strip().startswith("#")]
+    assert not any("logo_etablissement" in l for l in lignes_de_code)
     assert '".streamlit" / "config.toml"' in spec
     for document in ("guide_utilisateur.md", "guide_administrateur.md", "politique_confidentialite.md",
                      "conditions_utilisation.md"):

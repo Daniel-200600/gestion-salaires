@@ -425,3 +425,65 @@ def test_sauvegarde_complete_contient_les_modeles(base_avec_donnees, dossier_sau
     chemin_zip = backup_service.creer_sauvegarde_complete(db_path=base_avec_donnees, backup_dir=dossier_sauvegardes)
     with zipfile.ZipFile(chemin_zip) as archive:
         assert archive.read("modeles_bulletin/modele_abc.pdf") == b"%PDF modele"
+
+
+# ---------------------------------------------------------------------
+# Sauvegarde automatique quotidienne
+# ---------------------------------------------------------------------
+
+def _vieillir(chemin, jours):
+    """Recule la date d'une sauvegarde (la date affichée est celle du fichier)."""
+    import os
+
+    horodatage = time.time() - jours * 86400
+    os.utime(chemin, (horodatage, horodatage))
+
+
+def test_sauvegarde_automatique_creee_au_premier_usage(base_avec_donnees, dossier_sauvegardes):
+    chemin = backup_service.sauvegarde_automatique_si_necessaire(db_path=base_avec_donnees, backup_dir=dossier_sauvegardes)
+    assert chemin is not None and chemin.name.startswith(backup_service.PREFIXE_SAUVEGARDE_AUTO)
+    assert backup_service.verifier_integrite(chemin).valide
+
+
+def test_une_seule_sauvegarde_automatique_par_jour(base_avec_donnees, dossier_sauvegardes):
+    assert backup_service.sauvegarde_automatique_si_necessaire(db_path=base_avec_donnees, backup_dir=dossier_sauvegardes)
+    assert backup_service.sauvegarde_automatique_si_necessaire(db_path=base_avec_donnees, backup_dir=dossier_sauvegardes) is None
+    assert len(backup_service.lister_sauvegardes_automatiques(dossier_sauvegardes)) == 1
+
+
+def test_nouvelle_sauvegarde_automatique_le_lendemain(base_avec_donnees, dossier_sauvegardes):
+    hier = backup_service.sauvegarde_automatique_si_necessaire(db_path=base_avec_donnees, backup_dir=dossier_sauvegardes)
+    _vieillir(hier, 1)
+    time.sleep(1.1)  # noms horodatés à la seconde
+    assert backup_service.sauvegarde_automatique_si_necessaire(db_path=base_avec_donnees, backup_dir=dossier_sauvegardes)
+    assert len(backup_service.lister_sauvegardes_automatiques(dossier_sauvegardes)) == 2
+
+
+def test_seules_les_sauvegardes_automatiques_recentes_sont_conservees(base_avec_donnees, dossier_sauvegardes):
+    manuelle = backup_service.creer_sauvegarde(db_path=base_avec_donnees, backup_dir=dossier_sauvegardes)
+    _vieillir(manuelle, 30)
+    anciennes = []
+    for jours in (5, 4, 3):
+        chemin = backup_service.creer_sauvegarde(
+            db_path=base_avec_donnees, backup_dir=dossier_sauvegardes, prefixe=backup_service.PREFIXE_SAUVEGARDE_AUTO
+        )
+        compagnon = backup_service.dossier_modeles_de_la_sauvegarde(chemin)
+        compagnon.mkdir()
+        _vieillir(chemin, jours)
+        anciennes.append((chemin, compagnon))
+
+    backup_service.sauvegarde_automatique_si_necessaire(
+        db_path=base_avec_donnees, backup_dir=dossier_sauvegardes, conserver=2
+    )
+
+    noms = [s.nom for s in backup_service.lister_sauvegardes_automatiques(dossier_sauvegardes)]
+    assert len(noms) == 2 and anciennes[2][0].name in noms  # la nouvelle + la plus récente des anciennes
+    for chemin, compagnon in anciennes[:2]:
+        assert not chemin.exists() and not compagnon.exists()
+    assert manuelle.exists()  # une sauvegarde manuelle n'est jamais supprimée
+
+
+def test_sauvegarde_automatique_ne_leve_jamais(tmp_path, dossier_sauvegardes):
+    assert backup_service.sauvegarde_automatique_si_necessaire(
+        db_path=tmp_path / "absente.db", backup_dir=dossier_sauvegardes
+    ) is None

@@ -38,6 +38,12 @@ PREFIXE_SAUVEGARDE_SECURITE = "avant_restauration_"
 # retomberait sur le modèle Word standard.
 SUFFIXE_DOSSIER_MODELES = "_modeles"
 
+# Sauvegarde automatique : une par jour, au premier usage de l'application
+# dans la journée ; seules les plus récentes sont conservées. Les
+# sauvegardes manuelles et de sécurité ne sont jamais supprimées.
+PREFIXE_SAUVEGARDE_AUTO = "auto_"
+NOMBRE_SAUVEGARDES_AUTO_CONSERVEES = 30
+
 # Signature de fichier attendue en tête d'une base SQLite valide.
 _ENTETE_SQLITE = b"SQLite format 3\x00"
 
@@ -249,6 +255,52 @@ def lister_sauvegardes(backup_dir: Optional[Path] = None) -> List[InfoSauvegarde
         ))
 
     return sorted(sauvegardes, key=lambda s: s.date_creation, reverse=True)
+
+
+def lister_sauvegardes_automatiques(backup_dir: Optional[Path] = None) -> List[InfoSauvegarde]:
+    """Sauvegardes automatiques uniquement, les plus récentes en premier."""
+    return [s for s in lister_sauvegardes(backup_dir) if s.nom.startswith(PREFIXE_SAUVEGARDE_AUTO)]
+
+
+def sauvegarde_automatique_si_necessaire(
+    db_path: Optional[Path] = None,
+    backup_dir: Optional[Path] = None,
+    maintenant: Optional[datetime] = None,
+    conserver: int = NOMBRE_SAUVEGARDES_AUTO_CONSERVEES,
+) -> Optional[Path]:
+    """
+    Crée la sauvegarde automatique du jour si elle n'existe pas encore,
+    puis supprime les sauvegardes automatiques au-delà des `conserver`
+    plus récentes. Retourne le chemin créé, ou None si rien n'était à
+    faire.
+
+    Ne lève jamais d'exception : un échec est journalisé, mais ne doit
+    jamais empêcher d'utiliser l'application.
+    """
+    source = Path(db_path) if db_path is not None else DB_PATH
+    dossier = Path(backup_dir) if backup_dir is not None else BACKUP_DIR
+    maintenant = maintenant or datetime.now()
+    if not source.exists():
+        return None
+
+    existantes = lister_sauvegardes_automatiques(dossier)
+    if existantes and existantes[0].date_creation.date() >= maintenant.date():
+        return None
+
+    try:
+        chemin = creer_sauvegarde(db_path=source, backup_dir=dossier, prefixe=PREFIXE_SAUVEGARDE_AUTO)
+    except (BackupServiceError, OSError) as erreur:
+        logger.error("Sauvegarde automatique impossible : %s", erreur)
+        return None
+
+    for ancienne in lister_sauvegardes_automatiques(dossier)[max(conserver, 1):]:
+        try:
+            ancienne.chemin.unlink(missing_ok=True)
+            shutil.rmtree(dossier_modeles_de_la_sauvegarde(ancienne.chemin), ignore_errors=True)
+            logger.info("Ancienne sauvegarde automatique supprimée : %s", ancienne.nom)
+        except OSError as erreur:
+            logger.warning("Impossible de supprimer %s : %s", ancienne.nom, erreur)
+    return chemin
 
 
 def restaurer_sauvegarde(

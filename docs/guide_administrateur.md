@@ -40,10 +40,11 @@ Onglet **Sauvegarde** : **Créer une sauvegarde maintenant** produit une copie c
 
 Des sauvegardes sont aussi créées automatiquement :
 
+- chaque jour, à la première utilisation de l'application (`auto_<date>.db`) ; les 30 plus récentes sont conservées, les plus anciennes sont supprimées automatiquement ;
 - avant une restauration (`avant_restauration_<date>.db`) ;
 - avant une réinitialisation des données (`avant_reinitialisation_<date>.db`, et `Avant_Reinitialisation_<date>.zip` qui contient aussi les fichiers générés).
 
-L'application ne supprime jamais de sauvegarde. Copiez régulièrement le dossier des sauvegardes sur un support externe : une sauvegarde conservée sur le même disque ne protège pas contre la perte de ce disque.
+En dehors des sauvegardes quotidiennes au-delà des 30 plus récentes, l'application ne supprime jamais de sauvegarde ; l'onglet indique la date de la dernière sauvegarde automatique et le type de chacune. Copiez régulièrement le dossier des sauvegardes sur un support externe : une sauvegarde conservée sur le même disque ne protège pas contre la perte de ce disque.
 
 ## 5. Restauration
 

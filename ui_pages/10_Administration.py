@@ -595,6 +595,14 @@ with onglet_utilisateurs:
 # =======================================================================
 # Onglet Sauvegarde
 # =======================================================================
+def _type_sauvegarde(nom: str) -> str:
+    if nom.startswith(backup_service.PREFIXE_SAUVEGARDE_AUTO):
+        return "Automatique"
+    if nom.startswith(backup_service.PREFIXE_SAUVEGARDE):
+        return "Manuelle"
+    return "Sécurité (avant restauration ou réinitialisation)"
+
+
 with onglet_sauvegarde:
     st.subheader("Créer une sauvegarde")
     st.caption(
@@ -613,6 +621,19 @@ with onglet_sauvegarde:
             st.error(str(erreur))
 
     st.divider()
+    st.subheader("Sauvegarde automatique")
+    derniere_auto = next(iter(backup_service.lister_sauvegardes_automatiques()), None)
+    st.caption(
+        "Une sauvegarde est créée automatiquement chaque jour, à la première utilisation de "
+        f"l'application ; les {backup_service.NOMBRE_SAUVEGARDES_AUTO_CONSERVEES} plus récentes sont "
+        "conservées. Les sauvegardes manuelles ne sont jamais supprimées."
+    )
+    if derniere_auto is None:
+        st.info("Aucune sauvegarde automatique pour l'instant.")
+    else:
+        st.success(f"Dernière sauvegarde automatique : {derniere_auto.date_creation.strftime('%d/%m/%Y à %H:%M')}.")
+
+    st.divider()
     st.subheader("Sauvegardes disponibles")
 
     sauvegardes = backup_service.lister_sauvegardes()
@@ -622,6 +643,7 @@ with onglet_sauvegarde:
         lignes_sauvegardes = [
             {
                 "Nom": s.nom,
+                "Type": _type_sauvegarde(s.nom),
                 "Date": s.date_creation.strftime("%d/%m/%Y %H:%M:%S"),
                 "Taille": s.taille_lisible,
                 "Emplacement": str(s.chemin.parent),

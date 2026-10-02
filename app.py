@@ -25,6 +25,7 @@ barrière de sécurité ; ce filtrage n'est qu'un confort d'affichage.
 """
 
 import sys
+from datetime import date
 from pathlib import Path
 
 # Garantit que la racine du projet est importable, quel que soit le
@@ -37,6 +38,7 @@ from config.settings import FAVICON_PATH, LOGO_HORIZONTAL_PATH, LOGO_SYMBOLE_PAT
 from database.initialization import init_database
 from exports.excel_export import EXPORT_DIR
 from exports.word_export import EXPORT_DIR_BULLETINS
+from services.backup_service import sauvegarde_automatique_si_necessaire
 from utils.navigation import construire_blocs_visibles
 from utils.session_auth import afficher_bandeau_utilisateur, exiger_authentification, utilisateur_courant_role
 
@@ -48,6 +50,13 @@ init_database()
 # l'installation, sur n'importe quelle machine (portabilité, module 10).
 EXPORT_DIR.mkdir(parents=True, exist_ok=True)
 EXPORT_DIR_BULLETINS.mkdir(parents=True, exist_ok=True)
+
+# Sauvegarde automatique quotidienne (premier usage de la journée). Streamlit
+# réexécute ce script à chaque interaction : la vérification n'a lieu qu'une
+# fois par jour et par session. Jamais bloquante (voir backup_service).
+if st.session_state.get("_sauvegarde_auto_du") != date.today():
+    sauvegarde_automatique_si_necessaire()
+    st.session_state["_sauvegarde_auto_du"] = date.today()
 
 # Favicon : fichier image dédié (assets/favicon.png), jamais un emoji.
 # Résolu via config.paths.resource_root(), donc identique en
