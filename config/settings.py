@@ -18,7 +18,7 @@ from config.paths import resource_root, user_data_root
 # l'afficher (page d'accueil, pied de page, README généré) importe
 # cette constante plutôt que de la dupliquer.
 NOM_APPLICATION = "Gestion des Salaires"
-VERSION = "1.0.0"
+VERSION = "1.1.0"
 
 # Racine des ressources de l'application (lecture seule une fois installée :
 # templates, schéma SQL). Consciente de PyInstaller (module 20) — voir
@@ -44,6 +44,8 @@ LOG_FILE = LOGS_DIR / "app.log"
 # par l'administrateur, pas des données métier soumises à des contraintes
 # référentielles.
 PARAMETRES_PATH = DATA_DIR / "parametres_etablissement.json"
+# Modèles de bulletin importés par l'administrateur (Word ou PDF).
+MODELES_BULLETIN_DIR = DATA_DIR / "modeles_bulletin"
 
 # Emplacement du schéma SQL de référence
 SCHEMA_PATH = BASE_DIR / "database" / "schema.sql"
@@ -55,10 +57,28 @@ FAVICON_PATH = ASSETS_DIR / "favicon.png"
 FAVICON_ICO_PATH = ASSETS_DIR / "favicon.ico"
 LOGO_HORIZONTAL_PATH = ASSETS_DIR / "logo_horizontal.png"
 LOGO_SYMBOLE_PATH = ASSETS_DIR / "logo_symbole.png"
+# Logo de l'établissement : fichier LOCAL, exclu de Git, utilisé seulement
+# par `templates/build_template.py --etablissement` (en-tête du bulletin).
+LOGO_ETABLISSEMENT_PATH = ASSETS_DIR / "logo_etablissement.png"
 # Documentation intégrée à l'application (guides, politique, conditions).
 DOCS_DIR = BASE_DIR / "docs"
 
-# Taux de taxe légal appliqué sur la base taxable (5 %).
+# Modèles standard propres à l'établissement (en-tête et logo réels),
+# produits par `templates/build_template.py --etablissement` dans le dossier
+# de données (jamais publié) : ils remplacent les modèles neutres livrés
+# dans templates/ lorsqu'ils existent.
+MODELES_ETABLISSEMENT_DIR = DATA_DIR / "modeles_etablissement"
+
+
+def chemin_modele_standard(nom_fichier: str) -> Path:
+    """Modèle standard de l'établissement s'il a été produit, sinon le modèle neutre livré."""
+    propre = MODELES_ETABLISSEMENT_DIR / nom_fichier
+    return propre if propre.exists() else BASE_DIR / "templates" / nom_fichier
+
+# Taux de taxe par défaut appliqué sur la base taxable (5 %).
+# C'est la valeur initiale : l'administrateur peut définir un autre taux
+# (ex. 5,5 %) dans Administration › Paramètres ; chaque période conserve
+# son propre taux, figé à la validation (services/parametres_paie_service.py).
 # Decimal, jamais float : ce taux est utilisé directement dans des
 # calculs monétaires par services/paie_service.py (moteur de calcul de
 # paie) et ne doit jamais introduire d'imprécision flottante.

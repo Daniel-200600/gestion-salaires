@@ -1,0 +1,354 @@
+[
+ {
+  "page": 0,
+  "rect": [
+   436.04998779296875,
+   171.94979858398438,
+   489.4769287109375,
+   184.12680053710938
+  ],
+  "gabarit": "{PERIODE}",
+  "alignement": "centre",
+  "taille": 11.0,
+  "famille": "serif",
+  "gras": true,
+  "italique": false,
+  "couleur": [
+   0.0,
+   0.0,
+   0.0
+  ],
+  "ligne_base": 181.75,
+  "texte_origine": "JULY 2026"
+ },
+ {
+  "page": 0,
+  "rect": [
+   130.25,
+   195.79977416992188,
+   214.8070068359375,
+   207.97677612304688
+  ],
+  "gabarit": "{NOM_COMPLET}",
+  "alignement": "centre",
+  "taille": 11.0,
+  "famille": "serif",
+  "gras": true,
+  "italique": false,
+  "couleur": [
+   0.0,
+   0.0,
+   0.0
+  ],
+  "ligne_base": 205.6,
+  "texte_origine": "NOM PRENOMS"
+ },
+ {
+  "page": 0,
+  "rect": [
+   450.25103759765625,
+   195.79977416992188,
+   458.1930236816406,
+   207.97677612304688
+  ],
+  "gabarit": "{STATUT}",
+  "alignement": "centre",
+  "taille": 11.0,
+  "famille": "serif",
+  "gras": true,
+  "italique": false,
+  "couleur": [
+   0.0,
+   0.0,
+   0.0
+  ],
+  "ligne_base": 205.6,
+  "texte_origine": "V"
+ },
+ {
+  "page": 0,
+  "rect": [
+   332.04998779296875,
+   261.6997985839844,
+   343.04998779296875,
+   273.8768005371094
+  ],
+  "gabarit": "{TOTAL_HEURES}",
+  "alignement": "centre",
+  "taille": 11.0,
+  "famille": "serif",
+  "gras": true,
+  "italique": false,
+  "couleur": [
+   0.0,
+   0.0,
+   0.0
+  ],
+  "ligne_base": 271.5,
+  "texte_origine": "10"
+ },
+ {
+  "page": 0,
+  "rect": [
+   378.75,
+   261.6997985839844,
+   400.75,
+   273.8768005371094
+  ],
+  "gabarit": "{TAUX_HORAIRE}",
+  "alignement": "centre",
+  "taille": 11.0,
+  "famille": "serif",
+  "gras": true,
+  "italique": false,
+  "couleur": [
+   0.0,
+   0.0,
+   0.0
+  ],
+  "ligne_base": 271.5,
+  "texte_origine": "1800"
+ },
+ {
+  "page": 0,
+  "rect": [
+   428.20001220703125,
+   261.6997985839844,
+   455.70001220703125,
+   273.8768005371094
+  ],
+  "gabarit": "{GAIN_HEURES}",
+  "alignement": "centre",
+  "taille": 11.0,
+  "famille": "serif",
+  "gras": true,
+  "italique": false,
+  "couleur": [
+   0.0,
+   0.0,
+   0.0
+  ],
+  "ligne_base": 271.5,
+  "texte_origine": "18000"
+ },
+ {
+  "page": 0,
+  "rect": [
+   439.20001220703125,
+   288.2497863769531,
+   444.70001220703125,
+   300.4267883300781
+  ],
+  "gabarit": "{PRIME_AP_PP}",
+  "alignement": "centre",
+  "taille": 11.0,
+  "famille": "serif",
+  "gras": true,
+  "italique": false,
+  "couleur": [
+   0.0,
+   0.0,
+   0.0
+  ],
+  "ligne_base": 298.05,
+  "texte_origine": "0"
+ },
+ {
+  "page": 0,
+  "rect": [
+   439.20001220703125,
+   315.5497741699219,
+   444.70001220703125,
+   327.7267761230469
+  ],
+  "gabarit": "{SURVEILLANCE_SECRETARIAT}",
+  "alignement": "centre",
+  "taille": 11.0,
+  "famille": "serif",
+  "gras": true,
+  "italique": false,
+  "couleur": [
+   0.0,
+   0.0,
+   0.0
+  ],
+  "ligne_base": 325.35,
+  "texte_origine": "0"
+ },
+ {
+  "page": 0,
+  "rect": [
+   439.20001220703125,
+   342.8497619628906,
+   444.70001220703125,
+   355.0267639160156
+  ],
+  "gabarit": "{INDEMNITE_SUGGESTION_ADMIN}",
+  "alignement": "centre",
+  "taille": 11.0,
+  "famille": "serif",
+  "gras": true,
+  "italique": false,
+  "couleur": [
+   0.0,
+   0.0,
+   0.0
+  ],
+  "ligne_base": 352.65,
+  "texte_origine": "0"
+ },
+ {
+  "page": 0,
+  "rect": [
+   506.75,
+   370.1497802734375,
+   523.25,
+   382.3267822265625
+  ],
+  "gabarit": "{TAXE}",
+  "alignement": "centre",
+  "taille": 11.0,
+  "famille": "serif",
+  "gras": true,
+  "italique": false,
+  "couleur": [
+   0.0,
+   0.0,
+   0.0
+  ],
+  "ligne_base": 379.95,
+  "texte_origine": "990"
+ },
+ {
+  "page": 0,
+  "rect": [
+   512.25,
+   397.44976806640625,
+   517.75,
+   409.62677001953125
+  ],
+  "gabarit": "{RETENUE_AMICALE}",
+  "alignement": "centre",
+  "taille": 11.0,
+  "famille": "serif",
+  "gras": true,
+  "italique": false,
+  "couleur": [
+   0.0,
+   0.0,
+   0.0
+  ],
+  "ligne_base": 407.25,
+  "texte_origine": "0"
+ },
+ {
+  "page": 0,
+  "rect": [
+   512.25,
+   424.7497863769531,
+   517.75,
+   436.9267883300781
+  ],
+  "gabarit": "{DETTE}",
+  "alignement": "centre",
+  "taille": 11.0,
+  "famille": "serif",
+  "gras": true,
+  "italique": false,
+  "couleur": [
+   0.0,
+   0.0,
+   0.0
+  ],
+  "ligne_base": 434.55,
+  "texte_origine": "0"
+ },
+ {
+  "page": 0,
+  "rect": [
+   402.1000061035156,
+   453.6497802734375,
+   429.6000061035156,
+   465.8267822265625
+  ],
+  "gabarit": "{TOTAL_GAINS}",
+  "alignement": "centre",
+  "taille": 11.0,
+  "famille": "serif",
+  "gras": true,
+  "italique": false,
+  "couleur": [
+   0.0,
+   0.0,
+   0.0
+  ],
+  "ligne_base": 463.45,
+  "texte_origine": "18000"
+ },
+ {
+  "page": 0,
+  "rect": [
+   506.75,
+   453.6497802734375,
+   523.25,
+   465.8267822265625
+  ],
+  "gabarit": "{TOTAL_RETENUES}",
+  "alignement": "centre",
+  "taille": 11.0,
+  "famille": "serif",
+  "gras": true,
+  "italique": false,
+  "couleur": [
+   0.0,
+   0.0,
+   0.0
+  ],
+  "ligne_base": 463.45,
+  "texte_origine": "990"
+ },
+ {
+  "page": 0,
+  "rect": [
+   217.10000610351562,
+   468.59075927734375,
+   324.239990234375,
+   479.6607666015625
+  ],
+  "gabarit": "{NET_EN_LETTRES}",
+  "alignement": "centre",
+  "taille": 10.0,
+  "famille": "serif",
+  "gras": true,
+  "italique": false,
+  "couleur": [
+   0.0,
+   0.0,
+   0.0
+  ],
+  "ligne_base": 477.5,
+  "texte_origine": "Seventeen Thousand Ten"
+ },
+ {
+  "page": 0,
+  "rect": [
+   475.1000061035156,
+   468.0497741699219,
+   502.6000061035156,
+   480.2267761230469
+  ],
+  "gabarit": "{NET_A_PAYER}",
+  "alignement": "centre",
+  "taille": 11.0,
+  "famille": "serif",
+  "gras": true,
+  "italique": false,
+  "couleur": [
+   0.0,
+   0.0,
+   0.0
+  ],
+  "ligne_base": 477.85,
+  "texte_origine": "17010"
+ }
+]

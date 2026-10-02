@@ -20,6 +20,7 @@ from database.initialization import init_database
 from services.enseignant_service import (
     MESSAGE_BULLETIN_EXISTANT,
     EnseignantValidationError,
+    changer_statut_enseignant,
     creer_enseignant,
     desactiver_enseignant,
     lister_enseignants,
@@ -151,8 +152,8 @@ else:
     enseignant_id = options_enseignants[choix_libelle]
     enseignant_selectionne = obtenir_enseignant(enseignant_id)
 
-    onglet_fiche, onglet_modifier, onglet_etat, onglet_suppression = st.tabs(
-        ["Fiche détaillée", "Modifier", "Activer / Désactiver", "Supprimer définitivement"]
+    onglet_fiche, onglet_modifier, onglet_statut, onglet_etat, onglet_suppression = st.tabs(
+        ["Fiche détaillée", "Modifier", "Changer le statut", "Activer / Désactiver", "Supprimer définitivement"]
     )
 
     # --- Fiche détaillée -----------------------------------------------
@@ -228,22 +229,65 @@ else:
                         email=email_modifie,
                         telephone=telephone_modifie,
                         adresse=adresse_modifiee,
+                        utilisateur=st.session_state.get("username"),
                     )
                     st.success("Enseignant modifié avec succès.")
                     st.rerun()
                 except EnseignantValidationError as erreur:
                     st.error(str(erreur))
 
+    # --- Changer le statut (Vacataire <-> Permanent) ----------------
+    with onglet_statut:
+        peut_changer_statut = permission_service.a_permission(
+            utilisateur_courant_role(), permission_service.ENSEIGNANT_MODIFIER
+        )
+        st.write(f"**Statut actuel :** {libelle_statut(enseignant_selectionne.statut)}")
+        st.caption(
+            "Le nouveau statut s'applique aux calculs et aux bulletins produits à partir de maintenant. "
+            "Les bulletins déjà émis pour une période validée ou clôturée conservent le statut qu'ils "
+            "portaient. Chaque changement est inscrit au journal d'audit."
+        )
+        if not peut_changer_statut:
+            st.info("Vous n'avez pas la permission de modifier les enseignants (consultation seule).")
+        else:
+            autres_statuts = [o for o in OPTIONS_STATUT if o != libelle_statut(enseignant_selectionne.statut)]
+            with st.form(f"form_statut_{enseignant_id}"):
+                nouveau_statut_libelle = st.selectbox("Nouveau statut", autres_statuts)
+                confirme_statut = st.checkbox(
+                    f"Je confirme le passage de {enseignant_selectionne.prenom} {enseignant_selectionne.nom} "
+                    f"au statut « {nouveau_statut_libelle} »."
+                )
+                if st.form_submit_button("Changer le statut", type="primary"):
+                    if not confirme_statut:
+                        st.error("Cochez la case de confirmation pour changer le statut.")
+                    else:
+                        try:
+                            changer_statut_enseignant(
+                                enseignant_id, statut_depuis_libelle(nouveau_statut_libelle),
+                                utilisateur=st.session_state.get("username"),
+                            )
+                            st.success(f"Statut modifié : {nouveau_statut_libelle}.")
+                            st.rerun()
+                        except EnseignantValidationError as erreur:
+                            st.error(str(erreur))
+
     # --- Activer / Désactiver ---------------------------------------
     with onglet_etat:
+        peut_changer_etat = permission_service.a_permission(
+            utilisateur_courant_role(), permission_service.ENSEIGNANT_MODIFIER
+        )
         if enseignant_selectionne.actif:
             st.warning("Cet enseignant est actuellement **actif**.")
+        else:
+            st.warning("Cet enseignant est actuellement **inactif**.")
+        if not peut_changer_etat:
+            st.info("Vous n'avez pas la permission de modifier les enseignants (consultation seule).")
+        elif enseignant_selectionne.actif:
             if st.button("Désactiver cet enseignant"):
                 desactiver_enseignant(enseignant_id)
                 st.success("Enseignant désactivé. Il reste consultable dans l'historique.")
                 st.rerun()
         else:
-            st.warning("Cet enseignant est actuellement **inactif**.")
             if st.button("Réactiver cet enseignant"):
                 reactiver_enseignant(enseignant_id)
                 st.success("Enseignant réactivé.")

@@ -31,8 +31,8 @@ def creer(periode: PeriodePaie, db_path: DbPath = None) -> int:
     """Insère une nouvelle période (toujours créée au statut BROUILLON par défaut du schéma)."""
     with get_connection(db_path) as conn:
         curseur = conn.execute(
-            "INSERT INTO periodes_paie (mois, annee, libelle) VALUES (?, ?, ?)",
-            (periode.mois, periode.annee, periode.libelle),
+            "INSERT INTO periodes_paie (mois, annee, libelle, taux_taxe) VALUES (?, ?, ?, ?)",
+            (periode.mois, periode.annee, periode.libelle, str(periode.taux_taxe)),
         )
         conn.commit()
         return curseur.lastrowid
@@ -167,3 +167,15 @@ def supprimer_definitivement(
     with get_connection(db_path) as connexion:
         connexion.execute(requete, (periode_id,))
         connexion.commit()
+
+
+def modifier_taux_taxe(periode_id: int, taux_taxe, db_path: DbPath = None) -> None:
+    """
+    Met à jour le taux de taxe d'une période. Le trigger SQL
+    trg_periodes_paie_taux_fige refuse la modification si la période
+    est validée ou clôturée (défense en profondeur : le service vérifie
+    déjà le statut).
+    """
+    with get_connection(db_path) as conn:
+        conn.execute("UPDATE periodes_paie SET taux_taxe = ? WHERE id = ?", (str(taux_taxe), periode_id))
+        conn.commit()

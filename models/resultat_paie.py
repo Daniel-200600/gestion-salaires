@@ -28,6 +28,9 @@ Seules les heures (semaine_1..5, total_heures) restent en float.
 """
 
 from dataclasses import dataclass
+from decimal import Decimal
+
+from config.settings import TAUX_TAXE
 
 from models.enums import Sexe, StatutEnseignant
 
@@ -62,3 +65,6 @@ class ResultatPaie:
     retenue_amicale: int
     dette: int
     net_a_percevoir: int
+
+    # Taux de taxe appliqué (fraction, ex. Decimal("0.055")) — celui de la période.
+    taux_taxe: Decimal = TAUX_TAXE

@@ -20,6 +20,8 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 import streamlit as st
 
+from utils.formatters import formater_taux_taxe
+
 from database.initialization import init_database
 from models.enums import StatutPeriode
 from services import bulletin_service, comptabilite_service, periode_service
@@ -92,7 +94,7 @@ col4.metric("Enseignants incomplets/en erreur", len({a.enseignant_id for a in ra
 col5, col6, col7, col8, col9 = st.columns(5)
 col5.metric("Total heures", f"{etat.totaux.total_heures:g} h")
 col6.metric("Masse salariale brute", formater_fcfa(etat.totaux.total_gain_heures + etat.totaux.total_primes))
-col7.metric("Total taxe (5 %)", formater_fcfa(etat.totaux.total_taxe))
+col7.metric(f"Total taxe ({formater_taux_taxe(periode.taux_taxe)})", formater_fcfa(etat.totaux.total_taxe))
 col8.metric("Total retenues", formater_fcfa(etat.totaux.total_retenues))
 col9.metric("Total net à payer", formater_fcfa(etat.totaux.total_net_a_percevoir))
 st.caption(f"dont total dettes : {formater_fcfa(etat.totaux.total_dette)}")
@@ -185,7 +187,7 @@ for r in etat.resultats:
         "Surveillance/Secrétariat": formater_fcfa(r.surveillance_secretariat),
         "Indemnité": formater_fcfa(r.indemnite_suggestion_admin),
         "Base taxable": formater_fcfa(r.base_taxable),
-        "Taxe 5 %": formater_fcfa(r.taxe_5),
+        "Taxe": formater_fcfa(r.taxe_5),
         "Retenue amicale": formater_fcfa(r.retenue_amicale),
         "Dette": formater_fcfa(r.dette),
         "Net à payer": formater_fcfa(r.net_a_percevoir),

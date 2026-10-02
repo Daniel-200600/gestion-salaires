@@ -102,3 +102,50 @@ def migrer_audit_log_si_necessaire(conn: sqlite3.Connection, schema_sql: str) ->
 
     logger.info("Migration de audit_log terminée avec succès (%d ligne(s) conservée(s)).", nb_apres)
     return True
+
+
+# ---------------------------------------------------------------------
+# Colonnes ajoutées après coup (taux de taxe par période)
+# ---------------------------------------------------------------------
+
+# (table, colonne, définition SQL complète utilisée par ALTER TABLE)
+COLONNES_AJOUTEES = (
+    (
+        "periodes_paie",
+        "taux_taxe",
+        "taux_taxe TEXT NOT NULL DEFAULT '0.05' "
+        "CHECK (CAST(taux_taxe AS REAL) >= 0 AND CAST(taux_taxe AS REAL) < 1)",
+    ),
+)
+
+
+def _colonnes_table(conn: sqlite3.Connection, nom_table: str) -> set:
+    return {row[1] for row in conn.execute(f"PRAGMA table_info({nom_table})").fetchall()}
+
+
+def ajouter_colonnes_manquantes(conn: sqlite3.Connection) -> list:
+    """
+    Ajoute aux tables EXISTANTES les colonnes introduites par une
+    version plus récente (ALTER TABLE ... ADD COLUMN, sans perte de
+    donnée). Une base neuve n'est pas concernée : `schema.sql` crée
+    directement les tables complètes.
+
+    Les périodes existantes reçoivent le taux historique de 5 %
+    ('0.05', valeur par défaut de la colonne) : c'est le taux avec
+    lequel elles ont été calculées, leurs résultats restent donc
+    strictement identiques.
+
+    Retourne la liste des colonnes ajoutées (« table.colonne »).
+    """
+    ajoutees = []
+    for table, colonne, definition in COLONNES_AJOUTEES:
+        if _sql_table_existante(conn, table) is None:
+            continue
+        if colonne in _colonnes_table(conn, table):
+            continue
+        conn.execute(f"ALTER TABLE {table} ADD COLUMN {definition}")
+        ajoutees.append(f"{table}.{colonne}")
+        logger.info("Migration : colonne %s.%s ajoutée.", table, colonne)
+    if ajoutees:
+        conn.commit()
+    return ajoutees

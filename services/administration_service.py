@@ -33,6 +33,8 @@ from services import (
     backup_service,
     diagnostic_service,
     enseignant_service,
+    modele_bulletin_service,
+    parametres_paie_service,
     parametres_service,
     periode_service,
     permission_service,
@@ -233,3 +235,51 @@ def supprimer_enseignant(
 def supprimer_periode(acteur_id: Optional[int], periode_id: int, confirmation: bool = False, db_path: DbPath = None):
     exiger_permission_utilisateur(acteur_id, permission_service.PERIODE_SUPPRIMER, db_path)
     return periode_service.supprimer_periode_definitivement(periode_id, confirmation=confirmation, db_path=db_path)
+
+
+# ---------------------------------------------------------------------
+# Paramètres de paie (taux de taxe) — ADMIN uniquement
+# ---------------------------------------------------------------------
+
+def definir_taux_taxe_defaut(acteur_id: Optional[int], pourcentage, db_path: DbPath = None):
+    """Taux appliqué aux périodes créées ensuite. Aucune période existante n'est modifiée."""
+    acteur = exiger_permission_utilisateur(acteur_id, permission_service.PARAMETRES_PAIE_GERER, db_path)
+    return parametres_paie_service.definir_taux_taxe_defaut(pourcentage, utilisateur=acteur.username, db_path=db_path)
+
+
+def definir_taux_taxe_periode(acteur_id: Optional[int], periode_id: int, pourcentage, db_path: DbPath = None):
+    """Taux d'une période en brouillon ou ouverte (refusé si validée ou clôturée)."""
+    acteur = exiger_permission_utilisateur(acteur_id, permission_service.PARAMETRES_PAIE_GERER, db_path)
+    return parametres_paie_service.definir_taux_taxe_periode(
+        periode_id, pourcentage, utilisateur=acteur.username, db_path=db_path
+    )
+
+
+# ---------------------------------------------------------------------
+# Modèles de bulletin — ADMIN uniquement
+# ---------------------------------------------------------------------
+
+def analyser_modele_bulletin(acteur_id: Optional[int], contenu: bytes, nom_fichier: str, db_path: DbPath = None):
+    exiger_permission_utilisateur(acteur_id, permission_service.MODELE_BULLETIN_GERER, db_path)
+    return modele_bulletin_service.analyser_modele(contenu, nom_fichier)
+
+
+def importer_modele_bulletin(
+    acteur_id: Optional[int], nom: str, contenu: bytes, nom_fichier: str,
+    correspondances=None, alignements=None, activer: bool = False, db_path: DbPath = None,
+):
+    acteur = exiger_permission_utilisateur(acteur_id, permission_service.MODELE_BULLETIN_GERER, db_path)
+    return modele_bulletin_service.importer_modele(
+        nom, contenu, nom_fichier, correspondances=correspondances, alignements=alignements,
+        utilisateur=acteur.username, activer=activer, db_path=db_path,
+    )
+
+
+def activer_modele_bulletin(acteur_id: Optional[int], cle: str, db_path: DbPath = None):
+    acteur = exiger_permission_utilisateur(acteur_id, permission_service.MODELE_BULLETIN_GERER, db_path)
+    return modele_bulletin_service.activer_modele(cle, utilisateur=acteur.username, db_path=db_path)
+
+
+def supprimer_modele_bulletin(acteur_id: Optional[int], cle: str, db_path: DbPath = None) -> None:
+    acteur = exiger_permission_utilisateur(acteur_id, permission_service.MODELE_BULLETIN_GERER, db_path)
+    modele_bulletin_service.supprimer_modele(cle, utilisateur=acteur.username, db_path=db_path)

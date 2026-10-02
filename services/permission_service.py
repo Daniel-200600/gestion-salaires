@@ -56,6 +56,8 @@ DONNEES_REINITIALISER = "donnees.reinitialiser"
 # politique de confidentialité, conditions d'utilisation) : ouverte à
 # tout utilisateur authentifié, quel que soit son rôle.
 DOCUMENTATION_CONSULTER = "documentation.consulter"
+PARAMETRES_PAIE_GERER = "parametres_paie.gerer"
+MODELE_BULLETIN_GERER = "modele_bulletin.gerer"
 
 # ---------------------------------------------------------------------
 # Matrice des permissions (section 11) — source de vérité unique.
@@ -106,6 +108,8 @@ _MATRICE: Dict[str, Set[RoleUtilisateur]] = {
     # Opération destructive globale : strictement réservée à l'ADMIN.
     DONNEES_REINITIALISER: {RoleUtilisateur.ADMIN},
     DOCUMENTATION_CONSULTER: {RoleUtilisateur.ADMIN, RoleUtilisateur.GESTIONNAIRE_PAIE, RoleUtilisateur.CONSULTATION},
+    PARAMETRES_PAIE_GERER: {RoleUtilisateur.ADMIN},
+    MODELE_BULLETIN_GERER: {RoleUtilisateur.ADMIN},
 }
 
 
@@ -147,6 +151,8 @@ LIBELLES_PERMISSIONS: Dict[str, str] = {
     AUTOMATISATION_EXECUTER: "Lancer les traitements automatisés",
     DONNEES_REINITIALISER: "Réinitialiser les données métier",
     DOCUMENTATION_CONSULTER: "Consulter la documentation intégrée",
+    PARAMETRES_PAIE_GERER: "Modifier le taux de taxe (par défaut et par période)",
+    MODELE_BULLETIN_GERER: "Importer, activer et supprimer les modèles de bulletin",
 }
 
 

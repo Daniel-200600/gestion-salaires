@@ -171,9 +171,12 @@ def diagnostiquer_systeme(db_path: Optional[Path] = None) -> DiagnosticSysteme:
             # doit jamais faire planter le diagnostic lui-même.
             pass
 
-    # Bulletins : fichiers .docx réellement générés (le système du
+    # Bulletins : fichiers .docx / .pdf réellement générés (le système du
     # module 07 produit des fichiers, pas des lignes en base).
-    nombre_bulletins = len(list(EXPORT_DIR_BULLETINS.rglob("*.docx"))) if EXPORT_DIR_BULLETINS.exists() else 0
+    nombre_bulletins = (
+        sum(len(list(EXPORT_DIR_BULLETINS.rglob(f"*{ext}"))) for ext in (".docx", ".pdf"))
+        if EXPORT_DIR_BULLETINS.exists() else 0
+    )
 
     taille_exports = _taille_dossier(EXPORT_DIR)
     nombre_sauvegardes = len(backup_service.lister_sauvegardes(backup_dir=BACKUP_DIR))

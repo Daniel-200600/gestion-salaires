@@ -19,7 +19,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import List, Optional
 
-from config.settings import BACKUP_DIR, DB_PATH
+from config.settings import BACKUP_DIR, DB_PATH, MODELES_BULLETIN_DIR
 from database.initialization import get_table_names
 from models.audit_log import AuditLog
 from models.enums import TypeActionAudit
@@ -29,6 +29,14 @@ logger = logging.getLogger("salaires_app.backup_service")
 PREFIXE_SAUVEGARDE = "backup_"
 SUFFIXE_SAUVEGARDE = ".db"
 PREFIXE_SAUVEGARDE_SECURITE = "avant_restauration_"
+
+# Les modèles de bulletin importés sont des FICHIERS (data/modeles_bulletin/),
+# référencés par la table modeles_bulletin. Chaque sauvegarde de la base
+# emporte une copie de ces fichiers dans un dossier compagnon
+# (backup_2026-10-01_120000.db -> backup_2026-10-01_120000_modeles/),
+# remise en place à la restauration : sans eux, une base restaurée
+# retomberait sur le modèle Word standard.
+SUFFIXE_DOSSIER_MODELES = "_modeles"
 
 # Signature de fichier attendue en tête d'une base SQLite valide.
 _ENTETE_SQLITE = b"SQLite format 3\x00"
@@ -137,6 +145,39 @@ def verifier_integrite(chemin_base: Path) -> ResultatIntegrite:
     return ResultatIntegrite(True, "Base valide.")
 
 
+def dossier_modeles_de_la_base(db_path: Optional[Path] = None) -> Path:
+    """Dossier des modèles importés d'une base : toujours à côté d'elle (data/modeles_bulletin)."""
+    if db_path is None:
+        return MODELES_BULLETIN_DIR
+    return Path(db_path).parent / MODELES_BULLETIN_DIR.name
+
+
+def dossier_modeles_de_la_sauvegarde(chemin_sauvegarde: Path) -> Path:
+    """Dossier compagnon d'une sauvegarde : backup_X.db -> backup_X_modeles/."""
+    return chemin_sauvegarde.with_name(f"{chemin_sauvegarde.stem}{SUFFIXE_DOSSIER_MODELES}")
+
+
+def _copier_modeles(source: Path, destination: Path) -> int:
+    """
+    Copie les fichiers de `source` vers `destination` sans jamais écraser
+    un fichier déjà présent (les noms des modèles sont uniques). Retourne
+    le nombre de fichiers copiés.
+    """
+    if not source.is_dir():
+        return 0
+    fichiers = [f for f in source.iterdir() if f.is_file()]
+    if not fichiers:
+        return 0
+    destination.mkdir(parents=True, exist_ok=True)
+    copies = 0
+    for fichier in fichiers:
+        cible = destination / fichier.name
+        if not cible.exists():
+            shutil.copy2(fichier, cible)
+            copies += 1
+    return copies
+
+
 def creer_sauvegarde(
     db_path: Optional[Path] = None, backup_dir: Optional[Path] = None, prefixe: str = PREFIXE_SAUVEGARDE
 ) -> Path:
@@ -148,7 +189,8 @@ def creer_sauvegarde(
     Crée automatiquement le dossier de destination s'il n'existe pas.
     Le nom du fichier est horodaté (ex : backup_2026-09-14_165500.db) ;
     une collision de nom (même seconde) ne provoque jamais un
-    écrasement silencieux.
+    écrasement silencieux. Les modèles de bulletin importés sont copiés
+    dans le dossier compagnon (`dossier_modeles_de_la_sauvegarde`).
     """
     source = Path(db_path) if db_path is not None else DB_PATH
     dossier = Path(backup_dir) if backup_dir is not None else BACKUP_DIR
@@ -174,7 +216,16 @@ def creer_sauvegarde(
         logger.error("Échec de la sauvegarde de %s : %s", source, erreur)
         raise BackupServiceError(f"La sauvegarde a échoué : {erreur}") from erreur
 
-    logger.info("Sauvegarde créée : %s", destination.name)
+    dossier_compagnon = dossier_modeles_de_la_sauvegarde(destination)
+    try:
+        nb_modeles = _copier_modeles(dossier_modeles_de_la_base(source), dossier_compagnon)
+    except OSError as erreur:
+        destination.unlink(missing_ok=True)
+        shutil.rmtree(dossier_compagnon, ignore_errors=True)
+        logger.error("Échec de la copie des modèles de bulletin : %s", erreur)
+        raise BackupServiceError(f"La sauvegarde des modèles de bulletin a échoué : {erreur}") from erreur
+
+    logger.info("Sauvegarde créée : %s (%d modèle(s) de bulletin)", destination.name, nb_modeles)
     return destination
 
 
@@ -285,11 +336,26 @@ def restaurer_sauvegarde(
         _journaliser_audit(cible, "Échec post-vérification — état précédent restauré")
         return RapportRestauration(reussie=False, message=message, sauvegarde_securite=sauvegarde_securite)
 
+    # Modèles de bulletin importés : remis en place depuis le dossier
+    # compagnon (les fichiers déjà présents ne sont jamais écrasés).
+    message = "Restauration effectuée avec succès."
+    try:
+        nb_modeles = _copier_modeles(
+            dossier_modeles_de_la_sauvegarde(chemin_sauvegarde), dossier_modeles_de_la_base(cible)
+        )
+    except OSError as erreur:
+        logger.error("Modèles de bulletin non restaurés : %s", erreur)
+        message += (" Attention : les modèles de bulletin importés n'ont pas pu être remis en place "
+                    f"({erreur}) ; le modèle Word standard sera utilisé à leur place.")
+    else:
+        if nb_modeles:
+            message += f" {nb_modeles} modèle(s) de bulletin remis en place."
+
     logger.info("Restauration réussie depuis %s", chemin_sauvegarde.name)
     _journaliser_audit(cible, f"Succès depuis {chemin_sauvegarde.name}")
     return RapportRestauration(
         reussie=True,
-        message="Restauration effectuée avec succès.",
+        message=message,
         sauvegarde_securite=sauvegarde_securite,
     )
 
@@ -325,10 +391,9 @@ def _journaliser_audit(cible: Path, resultat: str) -> None:
 # ---------------------------------------------------------------------
 # Sauvegarde complète (base + documents) — module 14, section 36
 # ---------------------------------------------------------------------
-# IMPORTANT : `creer_sauvegarde()` ci-dessus ne sauvegarde QUE la base
-# SQLite, exactement comme depuis le module 10 — ce comportement reste
-# strictement inchangé (tous les tests existants continuent de le
-# vérifier). Les documents (bulletins, exports) vivent sur le système
+# IMPORTANT : `creer_sauvegarde()` ci-dessus ne sauvegarde que la base
+# SQLite (plus, dans son dossier compagnon, les modèles de bulletin
+# importés, qui en sont indissociables). Les documents (bulletins, exports) vivent sur le système
 # de fichiers, hors de la base : une sauvegarde de la seule base ne
 # les inclut jamais. `creer_sauvegarde_complete` est une fonction
 # NOUVELLE et SÉPARÉE, à utiliser explicitement lorsqu'une sauvegarde
@@ -347,7 +412,8 @@ def creer_sauvegarde_complete(
     """
     Produit une archive unique `Backup_Complet_{date}.zip` contenant à
     la fois une sauvegarde cohérente de la base SQLite (même mécanisme
-    que `creer_sauvegarde`) et une copie de `dossier_documents` (les
+    que `creer_sauvegarde`), les modèles de bulletin importés
+    (`modeles_bulletin/`) et une copie de `dossier_documents` (les
     fichiers déjà générés : bulletins, exports). Ne remplace pas
     `creer_sauvegarde` : les deux coexistent, chacune pour un usage
     différent.
@@ -373,6 +439,11 @@ def creer_sauvegarde_complete(
 
     with _zipfile.ZipFile(chemin_zip, "w", _zipfile.ZIP_DEFLATED) as archive:
         archive.write(sauvegarde_db, arcname=f"base_de_donnees/{sauvegarde_db.name}")
+        dossier_modeles = dossier_modeles_de_la_sauvegarde(sauvegarde_db)
+        if dossier_modeles.is_dir():
+            for fichier in dossier_modeles.iterdir():
+                if fichier.is_file():
+                    archive.write(fichier, arcname=f"modeles_bulletin/{fichier.name}")
         if dossier_documents is not None and dossier_documents.exists():
             for fichier in dossier_documents.rglob("*"):
                 if fichier.is_file():

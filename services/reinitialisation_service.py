@@ -11,8 +11,8 @@ conservant strictement à l'identique :
 - la table `utilisateurs` (identifiants, mots de passe hachés, rôles,
   statut actif/inactif, dates) — jamais lue autrement que pour
   vérifier qu'elle n'a pas changé ;
-- les entrées de SÉCURITÉ du journal d'audit (connexions, gestion des
-  comptes, restaurations, réinitialisations) ;
+- le journal d'audit en entier (sécurité ET historique métier : un
+  administrateur ne peut pas effacer la trace de ce qui a été fait) ;
 - la configuration : paramètres de l'établissement, schéma, sauvegardes,
   journaux techniques, modèle de bulletin.
 
@@ -95,41 +95,28 @@ CATEGORIES_SUPPRIMEES: Tuple[CategorieDonnees, ...] = (
 
 TABLES_CONSERVEES: Dict[str, str] = {
     "utilisateurs": "Comptes utilisateurs : identifiants, mots de passe, rôles et statut",
-    "audit_log": "Journal d'audit de sécurité : connexions, gestion des comptes, sauvegardes, réinitialisations",
+    "audit_log": "Journal d'audit complet : sécurité, administration et historique métier",
+    "parametres_paie": "Paramètres de paie : taux de taxe par défaut, modèle de bulletin actif",
+    "modeles_bulletin": "Modèles de bulletin importés (Word, PDF)",
 }
 
-# Entrées du journal d'audit CONSERVÉES (sécurité et administration).
-# Toutes les autres entrées décrivent des objets métier supprimés
-# (enseignant, période, bulletin, import, alerte...) : elles forment
-# l'historique métier et sont supprimées avec ces objets.
-TYPES_AUDIT_CONSERVES = frozenset({
-    TypeActionAudit.CONNEXION_REUSSIE.value,
-    TypeActionAudit.CONNEXION_ECHOUEE.value,
-    TypeActionAudit.DECONNEXION.value,
-    TypeActionAudit.UTILISATEUR_CREE.value,
-    TypeActionAudit.UTILISATEUR_MODIFIE.value,
-    TypeActionAudit.UTILISATEUR_DESACTIVE.value,
-    TypeActionAudit.UTILISATEUR_ACTIVE.value,
-    TypeActionAudit.MOT_DE_PASSE_MODIFIE.value,
-    TypeActionAudit.MOT_DE_PASSE_REINITIALISE.value,
-    TypeActionAudit.ROLE_MODIFIE.value,
-    TypeActionAudit.RESTAURATION_SAUVEGARDE.value,
-    TypeActionAudit.REINITIALISATION_DONNEES.value,
-    TypeActionAudit.REINITIALISATION_DONNEES_ECHEC.value,
-})
+# Le journal d'audit est conservé EN ENTIER, historique métier compris
+# (calculs, validations, exports...) : il doit permettre de retracer ce
+# qui a été fait sur les données, y compris par l'administrateur qui
+# lance la réinitialisation. La réinitialisation y ajoute sa propre entrée.
 
-LIBELLE_HISTORIQUE_METIER = "Historique métier (journal d'audit)"
 LIBELLE_FICHIERS = "Fichiers générés (bulletins, exports, archives)"
 
 ELEMENTS_CONSERVES: Tuple[str, ...] = (
     "Comptes utilisateurs, noms d'utilisateur et mots de passe",
     "Rôles et permissions",
     "Session en cours et paramètres de sécurité",
-    "Journal d'audit de sécurité (connexions, gestion des comptes, sauvegardes)",
+    "Journal d'audit complet (connexions, comptes, sauvegardes, calculs, validations, exports)",
     "Paramètres de l'établissement",
     "Sauvegardes existantes",
     "Journaux techniques",
-    "Modèle officiel de bulletin",
+    "Modèles de bulletin (standard et importés) et modèle actif",
+    "Taux de taxe par défaut des nouvelles périodes",
 )
 
 
@@ -195,18 +182,6 @@ def _tables_existantes(conn: sqlite3.Connection) -> List[str]:
 
 def _compter(conn: sqlite3.Connection, table: str) -> int:
     return conn.execute(f'SELECT COUNT(*) FROM "{table}"').fetchone()[0]
-
-
-def _placeholders_types_conserves() -> Tuple[str, Tuple[str, ...]]:
-    valeurs = tuple(sorted(TYPES_AUDIT_CONSERVES))
-    return ",".join("?" for _ in valeurs), valeurs
-
-
-def _compter_historique_metier(conn: sqlite3.Connection) -> int:
-    marqueurs, valeurs = _placeholders_types_conserves()
-    return conn.execute(
-        f"SELECT COUNT(*) FROM audit_log WHERE type_action NOT IN ({marqueurs})", valeurs
-    ).fetchone()[0]
 
 
 def _empreinte_comptes(conn: sqlite3.Connection) -> str:
@@ -304,7 +279,6 @@ def apercu_reinitialisation(db_path: DbPath = None, dossier_exports: Optional[Pa
         elements = {
             c.libelle: _compter(conn, c.table) for c in CATEGORIES_SUPPRIMEES if c.table in existantes
         }
-        elements[LIBELLE_HISTORIQUE_METIER] = _compter_historique_metier(conn) if "audit_log" in existantes else 0
         comptes = _compter(conn, "utilisateurs") if "utilisateurs" in existantes else 0
         audit_total = _compter(conn, "audit_log") if "audit_log" in existantes else 0
         classees = {c.table for c in CATEGORIES_SUPPRIMEES} | set(TABLES_CONSERVEES)
@@ -318,7 +292,7 @@ def apercu_reinitialisation(db_path: DbPath = None, dossier_exports: Optional[Pa
         fichiers_a_supprimer=nombre_fichiers,
         taille_fichiers_octets=taille,
         comptes_conserves=comptes,
-        entrees_audit_conservees=audit_total - elements[LIBELLE_HISTORIQUE_METIER],
+        entrees_audit_conservees=audit_total,
         tables_non_classees=non_classees,
     )
 
@@ -397,8 +371,6 @@ def _verifier_etat_avant_validation(
     for categorie in CATEGORIES_SUPPRIMEES:
         if _compter(conn, categorie.table) != 0:
             raise ReinitialisationError(f"La table {categorie.table} n'a pas pu être vidée.")
-    if _compter_historique_metier(conn) != 0:
-        raise ReinitialisationError("L'historique métier n'a pas pu être supprimé.")
     if _empreinte_comptes(conn) != empreinte_comptes:
         raise ReinitialisationError("Les comptes utilisateurs ont été modifiés : opération annulée.")
     if _noms_declencheurs(conn) != declencheurs_attendus:
@@ -535,7 +507,6 @@ def reinitialiser_donnees_metier(
         conn.execute("BEGIN IMMEDIATE;")
         try:
             elements = {c.libelle: _compter(conn, c.table) for c in CATEGORIES_SUPPRIMEES if c.table in existantes}
-            elements[LIBELLE_HISTORIQUE_METIER] = _compter_historique_metier(conn)
 
             declencheurs = _declencheurs_de_suppression(conn)
             for nom, _sql in declencheurs:
@@ -543,8 +514,6 @@ def reinitialiser_donnees_metier(
             for categorie in CATEGORIES_SUPPRIMEES:
                 if categorie.table in existantes:
                     conn.execute(f'DELETE FROM "{categorie.table}";')
-            marqueurs, valeurs = _placeholders_types_conserves()
-            conn.execute(f"DELETE FROM audit_log WHERE type_action NOT IN ({marqueurs})", valeurs)
             for _nom, sql in declencheurs:
                 conn.execute(sql)
 

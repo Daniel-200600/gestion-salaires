@@ -16,19 +16,22 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
+import hashlib
 import platform
 import sqlite3
 
 import streamlit as st
 
 from config.logging_config import lire_dernieres_lignes, obtenir_logger
-from config.settings import BACKUP_DIR, DB_PATH, NOM_APPLICATION, TAUX_TAXE, VERSION
+from config.settings import BACKUP_DIR, DB_PATH, MODELES_BULLETIN_DIR, NOM_APPLICATION, VERSION
 from database.initialization import init_database
 from models.enums import RoleUtilisateur
 from services import (
     administration_service,
     backup_service,
     diagnostic_service,
+    modele_bulletin_service,
+    parametres_paie_service,
     parametres_service,
     periode_service,
     permission_service,
@@ -45,7 +48,11 @@ from services.reinitialisation_service import (
     PHRASE_CONFIRMATION,
     ReinitialisationError,
 )
+from services.modele_bulletin_service import LIBELLES_FORMAT, ModeleBulletinError
 from services.utilisateur_service import UtilisateurValidationError
+from exports import pdf_export
+from utils.balises_bulletin import BALISES
+from utils.detection_bulletin import meme_ligne
 from utils.session_auth import exiger_permission, utilisateur_courant_id, utilisateur_courant_role
 
 init_database()
@@ -56,7 +63,7 @@ acteur_id = utilisateur_courant_id()
 
 st.title("Administration")
 st.caption(
-    "Paramètres de l'établissement, comptes utilisateurs, sauvegardes, restauration, diagnostic, "
+    "Paramètres de l'établissement et de paie, modèles de bulletin, comptes utilisateurs, sauvegardes, restauration, diagnostic, "
     "maintenance, journaux techniques et réinitialisation des données. Page réservée aux administrateurs."
 )
 
@@ -64,10 +71,10 @@ LIBELLES_ROLES = administration_service.LIBELLES_ROLES
 ROLES_PAR_LIBELLE = {libelle: role for role, libelle in LIBELLES_ROLES.items()}
 
 (
-    onglet_parametres, onglet_utilisateurs, onglet_sauvegarde, onglet_restauration, onglet_diagnostic,
-    onglet_maintenance, onglet_logs, onglet_reinitialisation, onglet_apropos,
+    onglet_parametres, onglet_modeles, onglet_utilisateurs, onglet_sauvegarde, onglet_restauration,
+    onglet_diagnostic, onglet_maintenance, onglet_logs, onglet_reinitialisation, onglet_apropos,
 ) = st.tabs([
-    "Paramètres", "Utilisateurs", "Sauvegarde", "Restauration", "Diagnostic",
+    "Paramètres", "Modèles de bulletin", "Utilisateurs", "Sauvegarde", "Restauration", "Diagnostic",
     "Maintenance", "Journaux", "Réinitialisation des données", "À propos",
 ])
 
@@ -121,17 +128,48 @@ with onglet_parametres:
                 st.error(str(erreur))
 
     st.divider()
-    st.subheader("Paramètres de paie (lecture seule)")
-    st.caption(
-        "Ces valeurs sont des règles de calcul fixées dans config/settings.py. Elles ne sont pas "
-        "modifiables depuis l'interface, afin de préserver l'exactitude et la traçabilité des calculs "
-        "déjà effectués."
-    )
+    st.subheader("Paramètres de paie")
+    taux_defaut = parametres_paie_service.obtenir_taux_taxe_defaut()
     col_taux, col_devise_calc, col_semaines = st.columns(3)
-    col_taux.metric("Taux de taxe", f"{float(TAUX_TAXE) * 100:g} %")
+    col_taux.metric("Taux de taxe par défaut", parametres_paie_service.formater_taux(taux_defaut))
     col_devise_calc.metric("Devise de calcul", "FCFA")
     from config.settings import NB_SEMAINES_PAR_PERIODE
     col_semaines.metric("Semaines par période", NB_SEMAINES_PAR_PERIODE)
+
+    st.markdown("**Taux de taxe**")
+    st.caption(
+        "Le taux par défaut est recopié sur chaque nouvelle période. Le taux d'une période reste "
+        "ajustable (Gestion › Périodes de paie) tant qu'elle n'est pas validée, puis il est figé : "
+        "les bulletins validés ou clôturés sont toujours recalculés à l'identique. Modifier le taux "
+        "par défaut ne change aucune période existante."
+    )
+    with st.form("formulaire_taux_taxe"):
+        nouveau_pourcentage = st.number_input(
+            "Taux de taxe par défaut (%)", min_value=0.0, max_value=50.0, step=0.5, format="%.2f",
+            value=float(parametres_paie_service.taux_vers_pourcentage(taux_defaut)),
+            help="Exemple : 5,5 % = 5 % d'impôt + 10 % de centimes additionnels communaux.",
+        )
+        appliquer_periodes_ouvertes = st.checkbox(
+            "Appliquer aussi ce taux aux périodes en brouillon ou ouvertes", value=False,
+        )
+        if st.form_submit_button("Enregistrer le taux", type="primary"):
+            try:
+                administration_service.definir_taux_taxe_defaut(acteur_id, f"{nouveau_pourcentage:.2f}")
+                modifiees = []
+                if appliquer_periodes_ouvertes:
+                    for periode_modifiable in periode_service.lister_periodes():
+                        if parametres_paie_service.taux_periode_modifiable(periode_modifiable):
+                            administration_service.definir_taux_taxe_periode(
+                                acteur_id, periode_modifiable.id, f"{nouveau_pourcentage:.2f}"
+                            )
+                            modifiees.append(periode_modifiable.libelle)
+                message = "Taux de taxe par défaut enregistré."
+                if modifiees:
+                    message += " Périodes mises à jour : " + ", ".join(modifiees) + "."
+                st.success(message)
+                st.rerun()
+            except (parametres_paie_service.ParametrePaieError, AutorisationRefuseeError) as erreur:
+                st.error(str(erreur))
 
     with st.expander("Emplacements de stockage"):
         from config.settings import BACKUP_DIR as _BACKUP_DIR, DATA_DIR, LOGS_DIR
@@ -141,12 +179,238 @@ with onglet_parametres:
             f"Base de données     : {DB_PATH}\n"
             f"Dossier de données  : {DATA_DIR}\n"
             f"Exports Excel       : {EXPORT_DIR}\n"
-            f"Bulletins Word      : {EXPORT_DIR_BULLETINS}\n"
+            f"Bulletins           : {EXPORT_DIR_BULLETINS}\n"
             f"Sauvegardes         : {_BACKUP_DIR}\n"
             f"Journaux techniques : {LOGS_DIR}\n"
-            f"Modèle de bulletin  : {TEMPLATE_PATH}",
+            f"Modèle Word standard: {TEMPLATE_PATH}\n"
+            f"Modèles importés    : {MODELES_BULLETIN_DIR}",
             language=None,
         )
+
+# =======================================================================
+# Onglet Modèles de bulletin
+# =======================================================================
+MIME_PAR_FORMAT = {
+    "docx": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    "pdf": "application/pdf",
+}
+CHAMP_TEXTE_FIXE = "— texte fixe (ne pas remplacer) —"
+LIBELLES_CHAMPS = {f"{b.libelle} [{b.nom}]": b.nom for b in BALISES}
+CHAMPS_PAR_BALISE = {nom: libelle for libelle, nom in LIBELLES_CHAMPS.items()}
+
+
+def _afficher_apercu(format_, contenu_bulletin: bytes, nom_fichier: str, cle: str) -> None:
+    """Aperçu d'un bulletin d'essai : image pour un PDF, téléchargement dans tous les cas."""
+    if format_ == "pdf":
+        st.image(pdf_export.apercu_png(contenu_bulletin), caption="Bulletin d'essai (valeurs d'exemple)")
+    else:
+        st.caption("Aperçu Word : téléchargez le bulletin d'essai pour l'ouvrir dans Word.")
+    st.download_button(
+        "Télécharger le bulletin d'essai", data=contenu_bulletin, file_name=nom_fichier,
+        mime=MIME_PAR_FORMAT[format_], key=f"essai_{cle}",
+    )
+
+
+with onglet_modeles:
+    st.subheader("Modèle de bulletin actif")
+    modele_actif = modele_bulletin_service.obtenir_modele_actif()
+    st.write(
+        f"Les bulletins sont produits avec le modèle **{modele_actif.libelle}**. "
+        "Un seul modèle est actif à la fois ; le changement s'applique aux bulletins générés ensuite, "
+        "les fichiers déjà produits ne sont pas modifiés."
+    )
+
+    st.subheader("Modèles disponibles")
+    modeles = modele_bulletin_service.lister_modeles()
+    st.dataframe(
+        [
+            {
+                "Modèle": m.nom,
+                "Format": LIBELLES_FORMAT[m.format],
+                "Origine": "Standard (bulletin officiel)" if m.standard
+                else f"Importé le {m.date_import} par {m.utilisateur or '—'} ({m.nom_fichier_origine})",
+                "Actif": "Oui" if m.cle == modele_actif.cle else "Non",
+            }
+            for m in modeles
+        ],
+        use_container_width=True, hide_index=True,
+    )
+    libelles_modeles = {f"{m.libelle}{' — importé' if not m.standard else ''} [{m.cle}]": m for m in modeles}
+    choix_modele = libelles_modeles[st.selectbox("Choisir un modèle", list(libelles_modeles))]
+    col_activer, col_essai, col_supprimer = st.columns(3)
+    with col_activer:
+        if st.button("Activer ce modèle", disabled=choix_modele.cle == modele_actif.cle):
+            try:
+                administration_service.activer_modele_bulletin(acteur_id, choix_modele.cle)
+                st.success(f"Modèle activé : {choix_modele.libelle}.")
+                st.rerun()
+            except (ModeleBulletinError, AutorisationRefuseeError) as erreur:
+                st.error(str(erreur))
+    with col_essai:
+        if st.button("Produire un bulletin d'essai"):
+            try:
+                st.session_state["essai_modele"] = (
+                    choix_modele.cle, modele_bulletin_service.apercu_modele(choix_modele)
+                )
+            except ModeleBulletinError as erreur:
+                st.error(str(erreur))
+    with col_supprimer:
+        if not choix_modele.standard:
+            confirme_suppression_modele = st.checkbox("Confirmer la suppression", key="confirme_suppr_modele")
+            if st.button("Supprimer ce modèle", disabled=not confirme_suppression_modele):
+                try:
+                    administration_service.supprimer_modele_bulletin(acteur_id, choix_modele.cle)
+                    st.success("Modèle supprimé.")
+                    st.rerun()
+                except (ModeleBulletinError, AutorisationRefuseeError) as erreur:
+                    st.error(str(erreur))
+    essai = st.session_state.get("essai_modele")
+    if essai and essai[0] == choix_modele.cle:
+        _afficher_apercu(choix_modele.format, essai[1], f"Bulletin_essai{choix_modele.extension}", "existant")
+
+    st.divider()
+    st.subheader("Ajouter un modèle (Word ou PDF)")
+    st.markdown(
+        "Deux possibilités :\n\n"
+        "1. **Envoyer un bulletin déjà rempli** (par exemple un bulletin d'un mois précédent, en PDF exporté "
+        "depuis Excel ou en Word). L'application repère le nom, la période, le statut, les heures, les "
+        "montants et le net, puis vous propose les correspondances à vérifier.\n"
+        "2. **Envoyer un modèle à balises** : un document où chaque valeur variable est remplacée par une "
+        "balise, par exemple `{{NOM_COMPLET}}` ou `{{NET_A_PAYER}}` (liste ci-dessous). Dans un PDF, "
+        "`{{NET_A_PAYER|centre}}` centre la valeur sur l'emplacement de la balise.\n\n"
+        "Dans les deux cas, la mise en page, le logo, les couleurs et les textes fixes du document sont "
+        "reproduits à l'identique. Un bulletin d'essai est produit avant l'enregistrement."
+    )
+    with st.expander("Liste des balises reconnues"):
+        st.dataframe(
+            [{"Balise": "{{" + b.nom + "}}", "Contenu": b.libelle, "Exemple": b.exemple, "Catégorie": b.categorie}
+             for b in BALISES],
+            use_container_width=True, hide_index=True,
+        )
+    st.download_button(
+        "Télécharger le modèle Word standard (à balises, pour le personnaliser)",
+        data=modele_bulletin_service.modele_standard_word().contenu(),
+        file_name="Modele_bulletin_standard.docx", mime=MIME_PAR_FORMAT["docx"],
+    )
+
+    fichier_modele = st.file_uploader("Fichier du modèle (.docx ou .pdf, 10 Mo maximum)", type=["docx", "pdf"])
+    if fichier_modele is not None:
+        contenu_modele = fichier_modele.getvalue()
+        empreinte_modele = hashlib.sha256(contenu_modele).hexdigest()
+        analyse_en_cache = st.session_state.get("analyse_modele")
+        if not analyse_en_cache or analyse_en_cache[0] != empreinte_modele:
+            try:
+                analyse_en_cache = (
+                    empreinte_modele,
+                    administration_service.analyser_modele_bulletin(acteur_id, contenu_modele, fichier_modele.name),
+                )
+                st.session_state["analyse_modele"] = analyse_en_cache
+            except (ModeleBulletinError, AutorisationRefuseeError) as erreur:
+                st.error(str(erreur))
+                analyse_en_cache = None
+        if analyse_en_cache:
+            analyse = analyse_en_cache[1]
+            correspondances, alignements = None, None
+            if analyse.mode == "balises":
+                st.write(f"Modèle à balises ({LIBELLES_FORMAT[analyse.format]}) : "
+                         f"{len(analyse.balises)} balise(s) trouvée(s) — " + ", ".join(analyse.balises))
+                for erreur in analyse.erreurs:
+                    st.error(erreur)
+                if analyse.recommandees_manquantes:
+                    st.warning("Balises absentes (le modèle reste utilisable) : "
+                               + ", ".join(analyse.recommandees_manquantes) + ".")
+            else:
+                st.info(
+                    "Aucune balise dans ce document : il est traité comme un bulletin rempli. "
+                    f"{len(analyse.propositions)} champ(s) reconnu(s) automatiquement. Vérifiez la colonne "
+                    "« Champ » ligne par ligne, corrigez si besoin, puis produisez un bulletin d'essai."
+                )
+                # Champs reconnus en tête (dans l'ordre du document), puis les textes fixes.
+                segments_tries = sorted(
+                    analyse.segments,
+                    key=lambda seg: (seg.id not in analyse.propositions, seg.page, round(seg.y0), seg.x0),
+                )
+                seulement_reconnus = st.checkbox("Afficher uniquement les champs reconnus", value=False)
+                lignes_editeur = []
+                for segment in segments_tries:
+                    balise = analyse.propositions.get(segment.id, "")
+                    if seulement_reconnus and not balise:
+                        continue
+                    voisins = " · ".join(
+                        autre.texte for autre in segments_tries
+                        if autre.id != segment.id and meme_ligne(autre, segment)
+                    )
+                    ligne = {
+                        "Identifiant": segment.id,
+                        "Texte du document": segment.texte,
+                        "Même ligne": voisins[:80],
+                        "Champ": CHAMPS_PAR_BALISE.get(balise, CHAMP_TEXTE_FIXE),
+                    }
+                    if analyse.format == "pdf":
+                        ligne["Alignement"] = "centre"
+                    lignes_editeur.append(ligne)
+                configuration = {
+                    "Identifiant": None,
+                    "Texte du document": st.column_config.TextColumn("Texte du document", disabled=True),
+                    "Même ligne": st.column_config.TextColumn("Textes sur la même ligne", disabled=True),
+                    "Champ": st.column_config.SelectboxColumn(
+                        "Champ", options=[CHAMP_TEXTE_FIXE] + list(LIBELLES_CHAMPS), required=True,
+                    ),
+                    "Alignement": st.column_config.SelectboxColumn(
+                        "Alignement", options=["gauche", "centre", "droite"], required=True,
+                    ),
+                }
+                edition = st.data_editor(
+                    lignes_editeur, column_config=configuration, hide_index=True, use_container_width=True,
+                    num_rows="fixed", key=f"editeur_{empreinte_modele}_{seulement_reconnus}", height=460,
+                )
+                correspondances = dict(analyse.propositions) if seulement_reconnus else {}
+                alignements = {}
+                for ligne in edition:
+                    balise = LIBELLES_CHAMPS.get(ligne["Champ"])
+                    if balise:
+                        correspondances[ligne["Identifiant"]] = balise
+                    else:
+                        correspondances.pop(ligne["Identifiant"], None)
+                    alignements[ligne["Identifiant"]] = ligne.get("Alignement") or "centre"
+                for erreur in modele_bulletin_service.controler_correspondances(correspondances):
+                    st.warning(erreur)
+
+            nom_nouveau_modele = st.text_input(
+                "Nom du modèle", value=Path(fichier_modele.name).stem[:80], max_chars=80,
+            )
+            activer_nouveau = st.checkbox("Activer ce modèle dès son enregistrement", value=True)
+            col_apercu, col_enregistrer = st.columns(2)
+            with col_apercu:
+                if st.button("Produire un bulletin d'essai", key="essai_nouveau_modele"):
+                    try:
+                        contenu_construit, zones_construites = modele_bulletin_service.construire_modele(
+                            contenu_modele, analyse, correspondances, alignements
+                        )
+                        st.session_state["essai_nouveau"] = (
+                            empreinte_modele,
+                            modele_bulletin_service.apercu(analyse.format, contenu_construit, zones_construites),
+                        )
+                    except ModeleBulletinError as erreur:
+                        st.error(str(erreur))
+            with col_enregistrer:
+                if st.button("Enregistrer le modèle", type="primary"):
+                    try:
+                        nouveau = administration_service.importer_modele_bulletin(
+                            acteur_id, nom_nouveau_modele, contenu_modele, fichier_modele.name,
+                            correspondances=correspondances, alignements=alignements, activer=activer_nouveau,
+                        )
+                        st.session_state.pop("analyse_modele", None)
+                        st.session_state.pop("essai_nouveau", None)
+                        st.success(
+                            f"Modèle « {nouveau.nom} » enregistré"
+                            + (" et activé." if activer_nouveau else ".")
+                        )
+                    except (ModeleBulletinError, AutorisationRefuseeError) as erreur:
+                        st.error(str(erreur))
+            essai_nouveau = st.session_state.get("essai_nouveau")
+            if essai_nouveau and essai_nouveau[0] == empreinte_modele:
+                _afficher_apercu(analyse.format, essai_nouveau[1], f"Bulletin_essai.{analyse.format}", "nouveau")
 
 # =======================================================================
 # Onglet Utilisateurs
@@ -614,7 +878,7 @@ with onglet_reinitialisation:
             st.markdown("\n".join(f"- {element}" for element in ELEMENTS_CONSERVES))
             st.caption(
                 f"Comptes utilisateurs actuellement enregistrés : {apercu.comptes_conserves}. "
-                f"Entrées du journal de sécurité conservées : {apercu.entrees_audit_conservees}."
+                f"Entrées du journal d'audit conservées : {apercu.entrees_audit_conservees}."
             )
         if apercu.tables_non_classees:
             st.warning(

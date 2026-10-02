@@ -262,3 +262,40 @@ def test_chaque_page_exige_une_permission(page):
 def test_aucune_page_n_expose_la_reinitialisation_des_comptes():
     for page in (RACINE / "ui_pages").glob("*.py"):
         assert "reinitialiser_tous_les_comptes" not in page.read_text(encoding="utf-8")
+
+
+# Fonctions de modification des enseignants appelées depuis la page
+# Enseignants : chaque appel doit se trouver sous un test de permission
+# (sinon un compte CONSULTATION peut, par exemple, désactiver un enseignant).
+MODIFICATIONS_ENSEIGNANT = {
+    "modifier_enseignant", "changer_statut_enseignant", "desactiver_enseignant", "reactiver_enseignant",
+}
+
+
+def _appels_non_proteges(fichier: Path, fonctions: set) -> list:
+    source = fichier.read_text(encoding="utf-8")
+    arbre = ast.parse(source)
+    parents = {enfant: noeud for noeud in ast.walk(arbre) for enfant in ast.iter_child_nodes(noeud)}
+    fautifs = []
+    for noeud in ast.walk(arbre):
+        if not isinstance(noeud, ast.Call):
+            continue
+        nom = noeud.func.attr if isinstance(noeud.func, ast.Attribute) else getattr(noeud.func, "id", None)
+        if nom not in fonctions:
+            continue
+        courant, protege = noeud, False
+        while courant in parents:
+            courant = parents[courant]
+            if isinstance(courant, ast.If):
+                condition = ast.get_source_segment(source, courant.test) or ""
+                if "peut_" in condition or "a_permission" in condition:
+                    protege = True
+                    break
+        if not protege:
+            fautifs.append(f"{fichier.name}:{noeud.lineno} {nom}()")
+    return fautifs
+
+
+def test_modifications_d_enseignant_protegees_par_une_permission_dans_la_page():
+    page = RACINE / "ui_pages" / "1_Enseignants.py"
+    assert _appels_non_proteges(page, MODIFICATIONS_ENSEIGNANT) == []

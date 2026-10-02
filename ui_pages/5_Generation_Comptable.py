@@ -16,6 +16,8 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 import streamlit as st
 
+from utils.formatters import formater_taux_taxe
+
 from database.initialization import init_database
 from exports.excel_export import generer_fichier_excel, generer_nom_fichier
 from models.enums import StatutPeriode
@@ -111,7 +113,7 @@ lignes_apercu = [
         "Taux horaire": formater_fcfa(r.taux_horaire),
         "Gain heures": formater_fcfa(r.gain_heures),
         "Base taxable": formater_fcfa(r.base_taxable),
-        "Taxe 5 %": formater_fcfa(r.taxe_5),
+        "Taxe": formater_fcfa(r.taxe_5),
         "Net à percevoir": formater_fcfa(r.net_a_percevoir),
     }
     for numero, r in enumerate(etat.resultats, start=1)
@@ -120,7 +122,7 @@ st.dataframe(lignes_apercu, use_container_width=True, hide_index=True)
 
 col_t1, col_t2, col_t3 = st.columns(3)
 col_t1.metric("Total heures", f"{etat.totaux.total_heures:g} h")
-col_t2.metric("Total taxe (5 %)", formater_fcfa(etat.totaux.total_taxe))
+col_t2.metric(f"Total taxe ({formater_taux_taxe(periode.taux_taxe)})", formater_fcfa(etat.totaux.total_taxe))
 col_t3.metric("Total net à percevoir", formater_fcfa(etat.totaux.total_net_a_percevoir))
 
 st.divider()

@@ -43,6 +43,7 @@ Page **Gestion › Enseignants**.
 - **Création** : ouvrez **Ajouter un enseignant**, renseignez le nom, le prénom, le sexe, le statut (permanent ou vacataire) et le taux horaire en FCFA, puis cliquez sur **Enregistrer l'enseignant**. Les champs marqués d'un astérisque sont obligatoires.
 - **Recherche et liste** : la liste peut être filtrée par un terme de recherche ; les enseignants désactivés peuvent être affichés ou masqués.
 - **Modification** : sélectionnez l'enseignant dans **Actions sur un enseignant**, onglet **Modifier**. Le taux horaire enregistré sur la fiche est celui utilisé par les calculs ; les bulletins déjà figés d'une période validée ou clôturée conservent les montants de leur génération.
+- **Changement de statut** : onglet **Changer le statut**. Choisissez le nouveau statut (vacataire ou permanent), cochez la case de confirmation puis cliquez sur **Changer le statut**. Le nouveau statut s'applique aux calculs et aux bulletins produits à partir de ce moment ; un bulletin déjà émis pour une période validée ou clôturée garde le statut qu'il portait. Chaque changement est inscrit au journal d'audit.
 - **Désactivation** : onglet **Activer / Désactiver**. Un enseignant désactivé n'est plus proposé pour la saisie des données de paie ; son historique est conservé et il peut être réactivé.
 - **Suppression définitive** (administrateurs uniquement) : onglet **Supprimer définitivement**. La suppression est refusée si au moins un bulletin existe pour cet enseignant. Sinon, l'application affiche les données liées (heures, primes, retenues) qui seront supprimées avec lui et demande de saisir exactement le nom complet de l'enseignant pour confirmer.
 
@@ -55,6 +56,7 @@ Page **Gestion › Périodes de paie**. Une période correspond à un mois de pa
 - **Validation** : depuis **Contrôle & Historique › Contrôle de la paie** (voir section 8). La validation gèle les données de paie.
 - **Clôture** : depuis la même page, par un administrateur. Une période clôturée ne peut plus être modifiée ni supprimée.
 - **Suppression définitive** (administrateurs uniquement) : possible uniquement pour une période au statut Brouillon et sans bulletin.
+- **Taux de taxe** : chaque période porte son propre taux de taxe, affiché dans la liste. À la création, elle reçoit le taux par défaut réglé par l'administrateur (section 14). Tant que la période est en brouillon ou ouverte, un administrateur peut l'ajuster (**Appliquer ce taux à la période**) ; dès la validation, il est figé.
 
 La page **Paie › Cycle de paie** affiche l'étape actuelle de la période, sa progression et l'historique de ses changements de statut.
 
@@ -81,10 +83,12 @@ Le montant net est obtenu ainsi :
 
 1. gain horaire = total des heures × taux horaire ;
 2. base taxable = gain horaire + primes et indemnités ;
-3. taxe = 5 % de la base taxable ;
+3. taxe = base taxable × taux de taxe de la période (5 % par défaut) ;
 4. net à percevoir = base taxable − taxe − retenues.
 
-Exemple : 100 heures à 2 000 FCFA, 35 000 FCFA de primes et indemnités, 15 000 FCFA de retenues donnent une base taxable de 235 000 FCFA, une taxe de 11 750 FCFA et un net de 208 250 FCFA.
+Exemple au taux de 5 % : 100 heures à 2 000 FCFA, 35 000 FCFA de primes et indemnités, 15 000 FCFA de retenues donnent une base taxable de 235 000 FCFA, une taxe de 11 750 FCFA et un net de 208 250 FCFA.
+
+Exemple au taux de 5,5 % : 10 heures à 1 800 FCFA donnent 18 000 FCFA, une taxe de 990 FCFA et un net de 17 010 FCFA. Les montants sont arrondis au franc le plus proche.
 
 **Contrôle du résultat** : comparez les totaux affichés avec les données saisies, puis utilisez la page Contrôle de la paie (section 8) avant toute validation.
 
@@ -93,7 +97,7 @@ Exemple : 100 heures à 2 000 FCFA, 35 000 FCFA de primes et indemnités, 15 000
 Page **Paie › Bulletins de solde**.
 
 - **Génération** : choisissez la période, puis les enseignants (tous ou une sélection), vérifiez la prévisualisation et cliquez sur **Générer les bulletins**. Sur une période encore ouverte, les bulletins sont provisoires. Les anomalies bloquantes détectées sur la sélection sont signalées avant la génération.
-- **Consultation** : chaque bulletin est un document Word (.docx) conforme au modèle officiel de l'établissement. Ils sont enregistrés dans le registre des documents (section 10).
+- **Consultation** : chaque bulletin reproduit le bulletin officiel de l'établissement (en-tête bilingue et logo, bandes vertes et jaune, rubriques numérotées de 1 à 7, total, net à payer en chiffres et en lettres, zone « Fait à Yaoundé le : » laissée vierge pour la date et la signature). Il est produit au format du modèle actif, Word (.docx) ou PDF, choisi par l'administrateur (section 14). Le nom du modèle utilisé est rappelé en haut de la page. Les bulletins sont enregistrés dans le registre des documents (section 10).
 - **Export** : téléchargez un bulletin individuel ou l'archive ZIP de tous les bulletins générés.
 
 Pour une période clôturée, un bulletin déjà existant n'est jamais régénéré ni écrasé.
@@ -152,7 +156,8 @@ Page **Administration & Sécurité › Administration**, réservée aux administ
 
 - **Utilisateurs** : création des comptes, modification du nom, du prénom et du rôle, activation ou désactivation, réinitialisation du mot de passe.
 - **Rôles** : Administrateur, Gestionnaire de paie, Consultation (tableau en début de guide).
-- **Paramètres** : informations de l'établissement ; les paramètres de paie sont affichés en lecture seule.
+- **Paramètres** : informations de l'établissement ; taux de taxe par défaut des nouvelles périodes (par exemple 5,5 %), avec la possibilité de l'appliquer aussi aux périodes en brouillon ou ouvertes. Les périodes validées ou clôturées ne changent jamais.
+- **Modèles de bulletin** : choix du modèle actif (bulletin officiel en Word ou en PDF, ou modèle importé) ; ajout d'un modèle en envoyant un bulletin déjà rempli (Word ou PDF) ou un modèle à balises ; bulletin d'essai avant enregistrement.
 - **Sauvegardes** : création d'une copie horodatée de la base de données.
 - **Restauration** : remplacement de la base par une sauvegarde, après vérification du fichier et création d'une sauvegarde de sécurité.
 - **Diagnostics** : état de la base, des tables, des dossiers, des comptes administrateurs et du registre des documents.
@@ -161,9 +166,9 @@ Page **Administration & Sécurité › Administration**, réservée aux administ
 
 Onglet **Administration › Réinitialisation des données**, réservé aux administrateurs. Cette fonction remet l'application dans l'état d'une installation neuve **du point de vue des données de paie**, par exemple avant une mise en service réelle après une période d'essai.
 
-**Ce qui est supprimé** : enseignants, périodes de paie, heures, primes et indemnités, retenues, bulletins, registre des documents, fichiers générés (bulletins, exports Excel, archives, packs), historique des importations, alertes, et entrées du journal d'audit décrivant ces données (historique métier). Les statistiques et rapports, calculés à partir de ces données, redeviennent vides.
+**Ce qui est supprimé** : enseignants, périodes de paie, heures, primes et indemnités, retenues, bulletins, registre des documents, fichiers générés (bulletins, exports Excel, archives, packs), historique des importations, alertes. Les statistiques et rapports, calculés à partir de ces données, redeviennent vides.
 
-**Ce qui est conservé** : tous les comptes utilisateurs, leurs noms d'utilisateur, mots de passe, rôles et statuts ; les permissions ; votre session en cours ; le journal d'audit de sécurité (connexions, gestion des comptes, sauvegardes, réinitialisations) ; les paramètres de l'établissement ; les sauvegardes existantes ; les journaux techniques ; le modèle de bulletin.
+**Ce qui est conservé** : tous les comptes utilisateurs, leurs noms d'utilisateur, mots de passe, rôles et statuts ; les permissions ; votre session en cours ; le journal d'audit complet (connexions, gestion des comptes, sauvegardes, réinitialisations, calculs, validations, exports) ; les paramètres de l'établissement ; le taux de taxe par défaut ; les modèles de bulletin et le modèle actif ; les sauvegardes existantes ; les journaux techniques.
 
 **Les comptes ne sont PAS supprimés.** Après l'opération, chacun se connecte avec les mêmes identifiants qu'auparavant.
 

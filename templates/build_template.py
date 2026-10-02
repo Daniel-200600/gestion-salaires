@@ -1,39 +1,48 @@
 """
-Script de construction UNIQUE du template templates/bulletin_template.docx.
+Construction des modèles de bulletin STANDARD.
 
-Ce script n'est PAS appelé par l'application à l'exécution : il sert à
-créer (ou reconstruire volontairement) le template une seule fois. Le
-service exports/word_export.py se contente ensuite de CHARGER ce
-fichier existant et d'y injecter les valeurs — il ne reconstruit
-jamais la mise en page à chaque génération.
+Script exécuté une seule fois par le développeur (jamais par
+l'application à l'exécution) : il produit
 
-Reconstruit la structure d'un bulletin de solde d'établissement scolaire
-camerounais : en-tête bilingue (lignes définies dans config/settings.py),
-barre de titre BULLETIN DE SOLDE / PAYSLIP, bloc
-nom/statut, tableau des rubriques (gains/retenues), ligne Total, ligne
-NET A PAYER avec montant en lettres, bloc signature.
+- templates/bulletin_template.docx : modèle Word standard ;
+- templates/bulletin_modele_standard.pdf (+ .json) : le même bulletin
+  en PDF, obtenu en convertissant par LibreOffice le bulletin rempli
+  avec les valeurs d'exemple ; les zones à remplacer sont décrites dans
+  le fichier .json (``python templates/build_template.py --pdf``,
+  LibreOffice requis sur le poste du développeur seulement).
 
-Les placeholders {{...}} sont insérés comme des runs Word isolés
-(un placeholder = un run entier), afin que le remplacement dans
-exports/word_export.py soit fiable sans avoir à gérer des runs
-fragmentés (ce piège ne concerne que les documents édités
-manuellement dans Word, pas un document généré par ce script).
+La mise en page reproduit exactement le bulletin officiel fourni par
+l'établissement : mêmes positions de colonnes,
+mêmes hauteurs de lignes, mêmes couleurs (vert #00B050, jaune #FFFF00),
+mêmes polices (Times New Roman gras 11, en-tête 7 et 9 points,
+signature Arial gras), logo de l'établissement au centre de l'en-tête,
+mois en anglais, montants sans séparateur de milliers, montant net en
+lettres (anglais), zone « Fait à Yaoundé le : » laissée vierge pour la
+date et la signature manuscrites.
 
-Le logo de l'établissement n'est pas disponible comme fichier image
-dans les données de l'application : l'espace qui lui est réservé dans
-l'en-tête est conservé (cellule centrale), mais reste vide plutôt que
-d'inventer un graphique. Un chemin d'image pourra être ajouté plus
-tard via configuration si le fichier du logo est fourni.
+Toutes les dimensions ci-dessous sont relevées sur le PDF officiel, en
+points typographiques (1 pt = 1/72 pouce).
+
+Les balises {{...}} sont écrites chacune dans un run isolé : le
+remplacement de exports/word_export.py conserve ainsi la mise en forme.
+Les balises utilisées par le modèle Word sont les balises historiques
+de l'application (compatibilité avec les tests et les valeurs
+préparées par services/bulletin_service.py).
 """
 
+import os
+import shutil
+import subprocess
 import sys
+import tempfile
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from docx import Document
-from docx.enum.table import WD_TABLE_ALIGNMENT
-from docx.enum.text import WD_ALIGN_PARAGRAPH
+from docx.enum.section import WD_ORIENT
+from docx.enum.table import WD_TABLE_ALIGNMENT, WD_CELL_VERTICAL_ALIGNMENT
+from docx.enum.text import WD_ALIGN_PARAGRAPH, WD_LINE_SPACING
 from docx.oxml import OxmlElement
 from docx.oxml.ns import qn
 from docx.shared import Cm, Pt, RGBColor
@@ -42,257 +51,497 @@ from config.settings import (
     ETABLISSEMENT_ENTETE_EN,
     ETABLISSEMENT_ENTETE_FR,
     LIEU_SIGNATURE,
+    LOGO_ETABLISSEMENT_PATH,
+    MODELES_ETABLISSEMENT_DIR,
     TITRE_SIGNATAIRE_EN,
     TITRE_SIGNATAIRE_FR,
 )
 
-CHEMIN_TEMPLATE = Path(__file__).resolve().parent / "bulletin_template.docx"
+DOSSIER = Path(__file__).resolve().parent
+CHEMIN_TEMPLATE = DOSSIER / "bulletin_template.docx"
+CHEMIN_MODELE_PDF = DOSSIER / "bulletin_modele_standard.pdf"
+CHEMIN_ZONES_PDF = DOSSIER / "bulletin_modele_standard.json"
 
-VERT_BARRE = "1F7A3D"
-JAUNE_BARRE = "FFFF00"
-BLANC = "FFFFFF"
+# Par défaut : modèles NEUTRES livrés avec le dépôt (en-tête de
+# config/settings.py, sans logo). Avec --etablissement : en-tête et logo
+# lus dans config/etablissement_local.py (fichier local, exclu de Git) et
+# modèles écrits dans data/modeles_etablissement/, utilisés en priorité
+# par l'application (config.settings.chemin_modele_standard).
+ENTETE_FR, ENTETE_EN, LOGO = ETABLISSEMENT_ENTETE_FR, ETABLISSEMENT_ENTETE_EN, None
+
+
+def utiliser_version_etablissement() -> None:
+    global ENTETE_FR, ENTETE_EN, LOGO, CHEMIN_TEMPLATE, CHEMIN_MODELE_PDF, CHEMIN_ZONES_PDF
+    try:
+        from config import etablissement_local as local
+    except ImportError as erreur:
+        raise RuntimeError(
+            "config/etablissement_local.py est introuvable : copiez config/etablissement_local.example.py "
+            "et renseignez l'en-tête de l'établissement."
+        ) from erreur
+    ENTETE_FR, ENTETE_EN = local.ETABLISSEMENT_ENTETE_FR, local.ETABLISSEMENT_ENTETE_EN
+    LOGO = Path(getattr(local, "LOGO_ETABLISSEMENT_PATH", LOGO_ETABLISSEMENT_PATH))
+    MODELES_ETABLISSEMENT_DIR.mkdir(parents=True, exist_ok=True)
+    CHEMIN_TEMPLATE = MODELES_ETABLISSEMENT_DIR / CHEMIN_TEMPLATE.name
+    CHEMIN_MODELE_PDF = MODELES_ETABLISSEMENT_DIR / CHEMIN_MODELE_PDF.name
+    CHEMIN_ZONES_PDF = MODELES_ETABLISSEMENT_DIR / CHEMIN_ZONES_PDF.name
+
+# Champs remplis par le modèle PDF standard (identiques à ceux du modèle Word).
+BALISES_MODELE_PDF_STANDARD = (
+    "PERIODE", "NOM_COMPLET", "STATUT", "TOTAL_HEURES", "TAUX_HORAIRE", "GAIN_HEURES", "PRIME_AP_PP",
+    "SURVEILLANCE_SECRETARIAT", "INDEMNITE_SUGGESTION_ADMIN", "TAXE", "RETENUE_AMICALE", "DETTE",
+    "TOTAL_GAINS", "TOTAL_RETENUES", "NET_EN_LETTRES", "NET_A_PAYER",
+)
+
+VERT = "00B050"
+JAUNE = "FFFF00"
 NOIR = "000000"
+POLICE = "Times New Roman"
+POLICE_SIGNATURE = "Arial"
+
+# Largeurs des 7 colonnes de la grille (pt), relevées sur le modèle :
+# S/N | désignation (début) | désignation | heures | taux / GAINS | gains | RETENUES
+LARGEURS = [47.1, 44.9, 185.9, 52.2, 52.1, 52.3, 93.8]
+TRAIT_EPAIS = 12  # huitièmes de point (1,5 pt)
+TRAIT_FIN = 6
 
 
-def _ombrer_cellule(cellule, couleur_hex: str) -> None:
-    """Colore le fond d'une cellule de tableau (python-docx n'a pas d'API haut niveau pour cela)."""
+# ---------------------------------------------------------------------
+# Balises selon la variante
+# ---------------------------------------------------------------------
+
+def _balises(variante: str) -> dict:
+    """
+    Variante "word"    : balises historiques (un run par balise).
+    Variante "exemple" : bulletin rempli avec les valeurs d'exemple
+    (utils/balises_bulletin.py) ; sert de base au modèle PDF standard, dont les zones
+    à remplacer sont repérées par la même détection automatique que
+    pour un bulletin importé par l'administrateur.
+    """
+    if variante == "word":
+        return {
+            "PERIODE": ["{{PERIODE}}"], "NOM": ["{{NOM}}", " ", "{{PRENOM}}"], "STATUT": ["Statut: ", "{{STATUT}}"],
+            "TOTAL_HEURES": "{{TOTAL_HEURES}}", "TAUX_HORAIRE": "{{TAUX_HORAIRE}}", "GAIN_HEURES": "{{GAIN_HEURES}}",
+            "PRIME_AP_PP": "{{PRIME_AP_PP}}", "SURVEILLANCE_SECRETARIAT": "{{SURVEILLANCE_SECRETARIAT}}",
+            "INDEMNITE_SUGGESTION_ADMIN": "{{INDEMNITE_SUGGESTION_ADMIN}}", "TAXE": "{{TAXE_5}}",
+            "RETENUE_AMICALE": "{{RETENUE_AMICALE}}", "DETTE": "{{DETTE}}", "TOTAL_GAINS": "{{TOTAL_GAINS}}",
+            "TOTAL_RETENUES": "{{TOTAL_RETENUES}}", "NET_EN_LETTRES": "{{NET_EN_LETTRES}}",
+            "NET_A_PAYER": "{{NET_A_PERÇEVOIR}}",
+        }
+    if variante == "exemple":
+        from utils.balises_bulletin import valeurs_exemple
+        v = valeurs_exemple()
+        return {
+            "PERIODE": [v["PERIODE"]], "NOM": [v["NOM_COMPLET"]], "STATUT": [f"Statut: {v['STATUT']}"],
+            **{cle: v[cle] for cle in ("TOTAL_HEURES", "TAUX_HORAIRE", "GAIN_HEURES", "PRIME_AP_PP",
+                                       "SURVEILLANCE_SECRETARIAT", "INDEMNITE_SUGGESTION_ADMIN", "TAXE",
+                                       "RETENUE_AMICALE", "DETTE", "TOTAL_GAINS", "TOTAL_RETENUES",
+                                       "NET_EN_LETTRES", "NET_A_PAYER")},
+        }
+    raise ValueError(f"Variante inconnue : {variante}")
+
+
+# ---------------------------------------------------------------------
+# Aides XML (python-docx n'expose pas ces réglages)
+# ---------------------------------------------------------------------
+
+def _sous_element(parent, balise: str):
+    element = parent.find(qn(balise))
+    if element is None:
+        element = OxmlElement(balise)
+        parent.append(element)
+    return element
+
+
+def _ombrer(cellule, couleur: str) -> None:
     tcPr = cellule._tc.get_or_add_tcPr()
     shd = OxmlElement("w:shd")
     shd.set(qn("w:val"), "clear")
     shd.set(qn("w:color"), "auto")
-    shd.set(qn("w:fill"), couleur_hex)
+    shd.set(qn("w:fill"), couleur)
     tcPr.append(shd)
 
 
-def _texte_cellule(
-    cellule, texte: str, gras: bool = False, italique: bool = False,
-    taille: int = 10, couleur: str = NOIR, centre: bool = True,
-    police: str = "Times New Roman",
-) -> None:
-    """Remplace le contenu d'une cellule par un unique run (placeholder-safe)."""
+def _bordures_cellule(cellule, **cotes) -> None:
+    """cotes : top/bottom/left/right = taille en huitièmes de point, ou 0 pour aucun trait."""
+    tcPr = cellule._tc.get_or_add_tcPr()
+    borders = _sous_element(tcPr, "w:tcBorders")
+    for cote, taille in cotes.items():
+        element = borders.find(qn(f"w:{cote}"))
+        if element is None:
+            element = OxmlElement(f"w:{cote}")
+            borders.append(element)
+        if taille:
+            element.set(qn("w:val"), "single")
+            element.set(qn("w:sz"), str(taille))
+            element.set(qn("w:space"), "0")
+            element.set(qn("w:color"), NOIR)
+        else:
+            element.set(qn("w:val"), "nil")
+
+
+def _bordures_tableau(table, exterieur: int) -> None:
+    tblPr = table._tbl.tblPr
+    borders = _sous_element(tblPr, "w:tblBorders")
+    for cote in ("top", "left", "bottom", "right", "insideH", "insideV"):
+        element = OxmlElement(f"w:{cote}")
+        if exterieur and cote in ("top", "left", "bottom", "right"):
+            element.set(qn("w:val"), "single")
+            element.set(qn("w:sz"), str(exterieur))
+            element.set(qn("w:space"), "0")
+            element.set(qn("w:color"), NOIR)
+        else:
+            element.set(qn("w:val"), "nil")
+        borders.append(element)
+
+
+def _grille_fixe(table, largeurs_pt) -> None:
+    """Largeurs de colonnes exactes et disposition fixe (Word ne redimensionne pas)."""
+    tblPr = table._tbl.tblPr
+    layout = _sous_element(tblPr, "w:tblLayout")
+    layout.set(qn("w:type"), "fixed")
+    largeur_totale = _sous_element(tblPr, "w:tblW")
+    largeur_totale.set(qn("w:w"), str(int(round(sum(largeurs_pt) * 20))))
+    largeur_totale.set(qn("w:type"), "dxa")
+    marges = _sous_element(tblPr, "w:tblCellMar")
+    for cote, valeur in (("top", 0), ("bottom", 0), ("left", 20), ("right", 20)):
+        element = OxmlElement(f"w:{cote}")
+        element.set(qn("w:w"), str(valeur))
+        element.set(qn("w:type"), "dxa")
+        marges.append(element)
+    grille = table._tbl.tblGrid
+    for colonne, largeur in zip(grille.findall(qn("w:gridCol")), largeurs_pt):
+        colonne.set(qn("w:w"), str(int(round(largeur * 20))))
+    for ligne in table.rows:
+        for cellule, largeur in zip(ligne.cells, largeurs_pt):
+            cellule.width = Pt(largeur)
+
+
+def _hauteur(ligne, hauteur_pt: float, exacte: bool = True) -> None:
+    trPr = ligne._tr.get_or_add_trPr()
+    element = OxmlElement("w:trHeight")
+    element.set(qn("w:val"), str(int(round(hauteur_pt * 20))))
+    element.set(qn("w:hRule"), "exact" if exacte else "atLeast")
+    trPr.append(element)
+
+
+def _fusion(table, ligne: int, debut: int, fin: int):
+    return table.cell(ligne, debut) if debut == fin else table.cell(ligne, debut).merge(table.cell(ligne, fin))
+
+
+def _paragraphe_compact(paragraphe, alignement=WD_ALIGN_PARAGRAPH.CENTER) -> None:
+    paragraphe.alignment = alignement
+    format_ = paragraphe.paragraph_format
+    format_.space_before = Pt(0)
+    format_.space_after = Pt(0)
+    format_.line_spacing_rule = WD_LINE_SPACING.SINGLE
+
+
+def _ecrire(cellule, morceaux, taille: float = 11, gras: bool = True, italique: bool = False,
+            alignement=WD_ALIGN_PARAGRAPH.CENTER, vertical=WD_CELL_VERTICAL_ALIGNMENT.CENTER,
+            police: str = POLICE, retrait_gauche: float = 0, retrait_droit: float = 0) -> None:
+    """Écrit un paragraphe dans la cellule ; chaque morceau (texte ou balise) est un run distinct."""
+    if isinstance(morceaux, str):
+        morceaux = [morceaux]
     cellule.text = ""
+    cellule.vertical_alignment = vertical
     paragraphe = cellule.paragraphs[0]
-    paragraphe.alignment = WD_ALIGN_PARAGRAPH.CENTER if centre else WD_ALIGN_PARAGRAPH.LEFT
-    run = paragraphe.add_run(texte)
-    run.bold = gras
-    run.italic = italique
-    run.font.size = Pt(taille)
-    run.font.name = police
-    run.font.color.rgb = RGBColor.from_string(couleur)
-
-
-def _ajouter_ligne_entete_institution(cellule, lignes: list) -> None:
-    """Écrit plusieurs lignes (texte, gras, italique) dans une cellule d'en-tête institutionnelle."""
-    cellule.text = ""
-    for index, (texte, gras, italique) in enumerate(lignes):
-        paragraphe = cellule.paragraphs[0] if index == 0 else cellule.add_paragraph()
-        paragraphe.alignment = WD_ALIGN_PARAGRAPH.CENTER
-        run = paragraphe.add_run(texte)
+    _paragraphe_compact(paragraphe, alignement)
+    if retrait_gauche:
+        paragraphe.paragraph_format.left_indent = Pt(retrait_gauche)
+    if retrait_droit:
+        paragraphe.paragraph_format.right_indent = Pt(retrait_droit)
+    for morceau in morceaux:
+        run = paragraphe.add_run(morceau)
         run.bold = gras
         run.italic = italique
-        run.font.size = Pt(8.5)
-        run.font.name = "Times New Roman"
+        run.font.size = Pt(taille)
+        run.font.name = police
+        run._element.rPr.rFonts.set(qn("w:eastAsia"), police)
+        run.font.color.rgb = RGBColor.from_string(NOIR)
 
 
-def _fusionner_ligne(table, ligne: int, col_debut: int, col_fin: int):
-    return table.cell(ligne, col_debut).merge(table.cell(ligne, col_fin))
+# ---------------------------------------------------------------------
+# En-tête institutionnel (tableau imbriqué : FR | logo | EN)
+# ---------------------------------------------------------------------
+
+def _texte_entete(cellule, lignes, retrait_gauche: float, retrait_droit: float) -> None:
+    cellule.text = ""
+    cellule.vertical_alignment = WD_CELL_VERTICAL_ALIGNMENT.TOP
+    for index, (texte, taille, italique) in enumerate(lignes):
+        paragraphe = cellule.paragraphs[0] if index == 0 else cellule.add_paragraph()
+        _paragraphe_compact(paragraphe)
+        paragraphe.paragraph_format.left_indent = Pt(retrait_gauche)
+        paragraphe.paragraph_format.right_indent = Pt(retrait_droit)
+        if index == 0:
+            paragraphe.paragraph_format.space_before = Pt(7)
+        run = paragraphe.add_run(texte)
+        run.bold = True
+        run.italic = italique
+        run.font.size = Pt(taille)
+        run.font.name = POLICE
 
 
-def _ajouter_bordure_page(section) -> None:
-    """
-    Ajoute une bordure autour de chaque page (non exposé par l'API
-    haut niveau de python-docx : XML brut requis). Le modèle officiel
-    présente le bulletin encadré par une bordure fine.
-    """
-    sectPr = section._sectPr
-    pgBorders = OxmlElement("w:pgBorders")
-    pgBorders.set(qn("w:offsetFrom"), "page")
-    for cote in ("top", "left", "bottom", "right"):
-        bordure = OxmlElement(f"w:{cote}")
-        bordure.set(qn("w:val"), "single")
-        bordure.set(qn("w:sz"), "12")
-        bordure.set(qn("w:space"), "24")
-        bordure.set(qn("w:color"), "000000")
-        pgBorders.append(bordure)
-    sectPr.append(pgBorders)
+def _lignes_entete(textes, francais: bool):
+    lignes = []
+    for texte in textes:
+        devise = "Paix" in texte or "Peace" in texte
+        grande = francais and (devise or texte.startswith("REGION"))
+        lignes.append((texte, 9 if grande else 7, devise))
+    return lignes
+
+
+def _entete(cellule) -> None:
+    cellule.text = ""
+    _paragraphe_compact(cellule.paragraphs[0])
+    cellule.paragraphs[0].paragraph_format.line_spacing = Pt(1)
+    imbrique = cellule.add_table(rows=1, cols=3)
+    largeurs = [212.1, 110.0, 206.2]
+    _bordures_tableau(imbrique, exterieur=0)
+    _grille_fixe(imbrique, largeurs)
+    _texte_entete(imbrique.cell(0, 0), _lignes_entete(ENTETE_FR, True), 16, 16)
+    _texte_entete(imbrique.cell(0, 2), _lignes_entete(ENTETE_EN, False), 25, 26)
+    cellule_logo = imbrique.cell(0, 1)
+    cellule_logo.vertical_alignment = WD_CELL_VERTICAL_ALIGNMENT.TOP
+    paragraphe = cellule_logo.paragraphs[0]
+    _paragraphe_compact(paragraphe)
+    if LOGO is not None and LOGO.exists():
+        paragraphe.add_run().add_picture(str(LOGO), width=Pt(101.5), height=Pt(73.8))
+
+
+# ---------------------------------------------------------------------
+# Construction
+# ---------------------------------------------------------------------
+
+def construire_document(variante: str = "word") -> Document:
+    b = _balises(variante)
+    document = Document()
+    section = document.sections[0]
+    section.orientation = WD_ORIENT.PORTRAIT
+    section.page_height = Cm(29.7)
+    section.page_width = Cm(21.0)
+    section.top_margin = Pt(89.7)
+    section.bottom_margin = Cm(1.0)
+    marge = (Cm(21.0).pt - sum(LARGEURS)) / 2
+    section.left_margin = Pt(marge)
+    section.right_margin = Pt(marge)
+
+    normal = document.styles["Normal"]
+    normal.font.name = POLICE
+    normal.font.size = Pt(11)
+    normal.paragraph_format.space_after = Pt(0)
+    normal.paragraph_format.space_before = Pt(0)
+
+    # Le document ne contient qu'un tableau : on retire le paragraphe vide initial
+    # après coup (Word impose un paragraphe final, réduit à 1 pt).
+    table = document.add_table(rows=19, cols=7)
+    table.alignment = WD_TABLE_ALIGNMENT.CENTER
+    _bordures_tableau(table, exterieur=TRAIT_EPAIS)
+    _grille_fixe(table, LARGEURS)
+
+    # 0. En-tête institutionnel ---------------------------------------
+    _hauteur(table.rows[0], 80.2)
+    c = _fusion(table, 0, 0, 6)
+    _entete(c)
+    _bordures_cellule(c, bottom=TRAIT_EPAIS)
+
+    # 1. BULLETIN DE SOLDE / PAYSLIP | mois -----------------------------
+    _hauteur(table.rows[1], 14.4)
+    _fusionner_ligne_en_deux(table, 1, 4)
+    gauche, droite = table.cell(1, 0), table.cell(1, 4)
+    _ecrire(gauche, "BULLETIN DE SOLDE / PAYSLIP")
+    _ecrire(droite, b["PERIODE"])
+    for cellule in (gauche, droite):
+        _ombrer(cellule, VERT)
+        _bordures_cellule(cellule, top=TRAIT_EPAIS, bottom=TRAIT_EPAIS)
+    _bordures_cellule(gauche, right=TRAIT_EPAIS)
+    _bordures_cellule(droite, left=TRAIT_EPAIS)
+
+    # 2. Nom | Statut (jaune) ------------------------------------------
+    _hauteur(table.rows[2], 33.3)
+    _fusionner_ligne_en_deux(table, 2, 3)
+    gauche, droite = table.cell(2, 0), table.cell(2, 3)
+    _ecrire(gauche, b["NOM"])
+    _ecrire(droite, b["STATUT"])
+    for cellule in (gauche, droite):
+        _ombrer(cellule, JAUNE)
+        _bordures_cellule(cellule, top=TRAIT_EPAIS, bottom=TRAIT_EPAIS)
+    _bordures_cellule(gauche, right=TRAIT_EPAIS)
+    _bordures_cellule(droite, left=TRAIT_EPAIS)
+
+    # 3. Bande jaune vide ---------------------------------------------
+    _hauteur(table.rows[3], 14.4)
+    c = _fusion(table, 3, 0, 6)
+    _ecrire(c, "")
+    _ombrer(c, JAUNE)
+    _bordures_cellule(c, top=TRAIT_EPAIS, bottom=TRAIT_EPAIS)
+
+    # 4. ELEMENTS DE RENUMERATION / SALARY RUBRICS | MONTANT / AMOUNT ----
+    _hauteur(table.rows[4], 14.4)
+    _fusionner_ligne_en_deux(table, 4, 4)
+    gauche, droite = table.cell(4, 0), table.cell(4, 4)
+    _ecrire(gauche, "ELEMENTS DE RENUMERATION / SALARY RUBRICS")
+    _ecrire(droite, "MONTANT / AMOUNT")
+    for cellule in (gauche, droite):
+        _ombrer(cellule, VERT)
+        _bordures_cellule(cellule, top=TRAIT_EPAIS, bottom=TRAIT_EPAIS)
+    _bordures_cellule(gauche, right=TRAIT_EPAIS)
+    _bordures_cellule(droite, left=TRAIT_EPAIS)
+
+    # 5. En-têtes de colonnes -------------------------------------------
+    _hauteur(table.rows[5], 14.1)
+    _ecrire(table.cell(5, 0), "S/N")
+    designation = _fusion(table, 5, 1, 3)
+    _ecrire(designation, "DESIGNATION", alignement=WD_ALIGN_PARAGRAPH.LEFT, retrait_gauche=139.0)
+    _ecrire(table.cell(5, 4), "GAINS")
+    _ecrire(table.cell(5, 5), "")
+    _ecrire(table.cell(5, 6), "RETENUES")
+    for index in range(7):
+        _bordures_cellule(table.cell(5, index), top=TRAIT_EPAIS, bottom=TRAIT_FIN)
+
+    # 6-12. Rubriques ---------------------------------------------------
+    rubriques = [
+        ("1", "Gain Heures / Hourly Wage", {3: b["TOTAL_HEURES"], 4: b["TAUX_HORAIRE"], 5: b["GAIN_HEURES"]}, 4.0),
+        ("2", "Prime AP/PP / Incentive HOD/CM", {5: b["PRIME_AP_PP"]}, 0),
+        ("3", "Surveillance/Secretariat / Invigilation", {5: b["SURVEILLANCE_SECRETARIAT"]}, 0),
+        ("4", "Indemnite Suggestion / Duty Post Allowance", {5: b["INDEMNITE_SUGGESTION_ADMIN"]}, 0),
+        ("5", "Taxe / Tax", {6: b["TAXE"]}, 0),
+        ("6", "Retenue Amicale / Social Deduction", {6: b["RETENUE_AMICALE"]}, 0),
+        ("7", "Dette / Debt", {6: b["DETTE"]}, 0),
+    ]
+    haut = WD_CELL_VERTICAL_ALIGNMENT.TOP
+    for decalage, (numero, libelle, montants, retrait) in enumerate(rubriques):
+        indice = 6 + decalage
+        _hauteur(table.rows[indice], 27.3)
+        _ecrire(table.cell(indice, 0), numero, vertical=haut)
+        cellule_libelle = _fusion(table, indice, 1, 2)
+        _ecrire(cellule_libelle, libelle, alignement=WD_ALIGN_PARAGRAPH.LEFT, vertical=haut, retrait_gauche=retrait)
+        for colonne in range(3, 7):
+            _ecrire(table.cell(indice, colonne), montants.get(colonne, ""), vertical=haut)
+
+    # 13. Total ----------------------------------------------------------
+    _hauteur(table.rows[13], 14.4)
+    etiquette = _fusion(table, 13, 0, 1)
+    vide = _fusion(table, 13, 2, 3)
+    total_gains = _fusion(table, 13, 4, 5)
+    total_retenues = table.cell(13, 6)
+    _ecrire(etiquette, "Total")
+    _ecrire(vide, "")
+    _ecrire(total_gains, b["TOTAL_GAINS"])
+    _ecrire(total_retenues, b["TOTAL_RETENUES"])
+    for cellule in (etiquette, vide, total_gains, total_retenues):
+        _ombrer(cellule, VERT)
+        _bordures_cellule(cellule, top=TRAIT_EPAIS, bottom=TRAIT_EPAIS)
+    _bordures_cellule(vide, right=TRAIT_EPAIS)
+    _bordures_cellule(total_gains, left=TRAIT_EPAIS, right=TRAIT_EPAIS)
+    _bordures_cellule(total_retenues, left=TRAIT_EPAIS)
+
+    # 14. NET A PAYER ----------------------------------------------------
+    _hauteur(table.rows[14], 14.4)
+    etiquette = _fusion(table, 14, 0, 1)
+    lettres = _fusion(table, 14, 2, 4)
+    montant = _fusion(table, 14, 5, 6)
+    _ecrire(etiquette, "NET A PAYER")
+    _ecrire(lettres, b["NET_EN_LETTRES"], taille=10)
+    _ecrire(montant, b["NET_A_PAYER"])
+    for cellule in (etiquette, lettres, montant):
+        _ombrer(cellule, VERT)
+        _bordures_cellule(cellule, top=TRAIT_EPAIS, bottom=TRAIT_EPAIS)
+    _bordures_cellule(etiquette, right=TRAIT_EPAIS)
+    _bordures_cellule(lettres, left=TRAIT_EPAIS, right=TRAIT_EPAIS)
+    _bordures_cellule(montant, left=TRAIT_EPAIS)
+
+    # 15. Fait à ... le : (vierge : date et signature manuscrites) -------
+    _hauteur(table.rows[15], 14.0)
+    _ecrire(table.cell(15, 0), "")
+    cellule_lieu = _fusion(table, 15, 1, 6)
+    _ecrire(cellule_lieu, f"Done at {LIEU_SIGNATURE} on the / Fait à {LIEU_SIGNATURE} le:",
+            vertical=WD_CELL_VERTICAL_ALIGNMENT.TOP)
+    _bordures_cellule(table.cell(15, 0), top=TRAIT_EPAIS)
+    _bordures_cellule(cellule_lieu, top=TRAIT_EPAIS)
+
+    # 16. Espace de signature ---------------------------------------------
+    _hauteur(table.rows[16], 54.8)
+    _ecrire(_fusion(table, 16, 0, 6), "")
+
+    # 17. Titre du signataire ----------------------------------------------
+    _hauteur(table.rows[17], 13.8)
+    _ecrire(_fusion(table, 17, 0, 6), TITRE_SIGNATAIRE_FR + TITRE_SIGNATAIRE_EN,
+            alignement=WD_ALIGN_PARAGRAPH.RIGHT, police=POLICE_SIGNATURE, retrait_droit=34.0)
+
+    # 18. Marge basse du cadre ---------------------------------------------
+    _hauteur(table.rows[18], 14.5)
+    _ecrire(_fusion(table, 18, 0, 6), "")
+
+    # Paragraphe final imposé par Word : réduit au minimum.
+    dernier = document.paragraphs[-1] if document.paragraphs else document.add_paragraph()
+    _paragraphe_compact(dernier)
+    dernier.paragraph_format.line_spacing = Pt(1)
+    return document
+
+
+def _fusionner_ligne_en_deux(table, ligne: int, colonne_coupure: int) -> None:
+    """Fusionne une ligne en deux cellules : [0 .. coupure-1] et [coupure .. 6]."""
+    _fusion(table, ligne, 0, colonne_coupure - 1)
+    _fusion(table, ligne, colonne_coupure, 6)
 
 
 def construire_template() -> Path:
-    document = Document()
-
-    section = document.sections[0]
-    section.page_height = Cm(29.7)
-    section.page_width = Cm(21.0)
-    section.top_margin = Cm(1.2)
-    section.bottom_margin = Cm(1.2)
-    section.left_margin = Cm(1.5)
-    section.right_margin = Cm(1.5)
-    _ajouter_bordure_page(section)
-
-    style_normal = document.styles["Normal"]
-    style_normal.font.name = "Times New Roman"
-    style_normal.font.size = Pt(10)
-
-    # -------------------------------------------------------------
-    # En-tête institutionnelle bilingue (3 colonnes : FR | logo | EN)
-    # -------------------------------------------------------------
-    table_entete = document.add_table(rows=1, cols=3)
-    table_entete.alignment = WD_TABLE_ALIGNMENT.CENTER
-    table_entete.columns[0].width = Cm(7.5)
-    table_entete.columns[1].width = Cm(3.0)
-    table_entete.columns[2].width = Cm(7.5)
-
-    lignes_francais = [(texte, True, "Paix" in texte or "Peace" in texte) for texte in ETABLISSEMENT_ENTETE_FR]
-    lignes_anglais = [(texte, True, "Paix" in texte or "Peace" in texte) for texte in ETABLISSEMENT_ENTETE_EN]
-    _ajouter_ligne_entete_institution(table_entete.cell(0, 0), lignes_francais)
-    # Cellule centrale réservée au logo : volontairement vide (cf. docstring du module).
-    table_entete.cell(0, 1).text = ""
-    _ajouter_ligne_entete_institution(table_entete.cell(0, 2), lignes_anglais)
-
-    document.add_paragraph()  # espacement
-
-    # -------------------------------------------------------------
-    # Barre de titre : BULLETIN DE SOLDE / PAYSLIP | Période
-    # -------------------------------------------------------------
-    table_titre = document.add_table(rows=1, cols=2)
-    table_titre.alignment = WD_TABLE_ALIGNMENT.CENTER
-    table_titre.columns[0].width = Cm(12.0)
-    table_titre.columns[1].width = Cm(6.0)
-    _texte_cellule(table_titre.cell(0, 0), "BULLETIN DE SOLDE / PAYSLIP", gras=True, taille=11, couleur=BLANC, centre=False)
-    _texte_cellule(table_titre.cell(0, 1), "{{PERIODE}}", gras=True, taille=11, couleur=BLANC)
-    for cellule in table_titre.rows[0].cells:
-        _ombrer_cellule(cellule, VERT_BARRE)
-
-    # -------------------------------------------------------------
-    # Bloc identité : Nom Prénom | Statut
-    # -------------------------------------------------------------
-    table_identite = document.add_table(rows=1, cols=2)
-    table_identite.alignment = WD_TABLE_ALIGNMENT.CENTER
-    table_identite.columns[0].width = Cm(12.0)
-    table_identite.columns[1].width = Cm(6.0)
-    cellule_nom = table_identite.cell(0, 0)
-    cellule_nom.text = ""
-    p_nom = cellule_nom.paragraphs[0]
-    p_nom.alignment = WD_ALIGN_PARAGRAPH.CENTER
-    for jeton in ("{{NOM}}", " ", "{{PRENOM}}"):
-        run = p_nom.add_run(jeton)
-        run.bold = True
-        run.font.size = Pt(11)
-        run.font.name = "Times New Roman"
-    _texte_cellule(table_identite.cell(0, 1), "Statut: {{STATUT}}", gras=True, taille=11)
-    for cellule in table_identite.rows[0].cells:
-        _ombrer_cellule(cellule, JAUNE_BARRE)
-
-    document.add_paragraph()
-
-    # -------------------------------------------------------------
-    # Tableau des rubriques : S/N | DESIGNATION | GAINS | RETENUES
-    # -------------------------------------------------------------
-    table_rubriques = document.add_table(rows=0, cols=4)
-    table_rubriques.style = "Table Grid"
-    table_rubriques.alignment = WD_TABLE_ALIGNMENT.CENTER
-    largeurs = [Cm(1.3), Cm(9.5), Cm(3.6), Cm(3.6)]
-
-    def _nouvelle_ligne():
-        ligne = table_rubriques.add_row()
-        for cellule, largeur in zip(ligne.cells, largeurs):
-            cellule.width = largeur
-        return ligne
-
-    # -- En-tête large "ELEMENTS DE RENUMERATION / SALARY RUBRICS" | "MONTANT / AMOUNT"
-    ligne_bandeau = _nouvelle_ligne()
-    cellule_gauche = _fusionner_ligne(table_rubriques, 0, 0, 1)
-    _texte_cellule(cellule_gauche, "ELEMENTS DE RENUMERATION / SALARY RUBRICS", gras=True, taille=10, couleur=BLANC, centre=False)
-    cellule_droite = _fusionner_ligne(table_rubriques, 0, 2, 3)
-    _texte_cellule(cellule_droite, "MONTANT / AMOUNT", gras=True, taille=10, couleur=BLANC)
-    for cellule in (cellule_gauche, cellule_droite):
-        _ombrer_cellule(cellule, VERT_BARRE)
-
-    # -- En-tête de colonnes
-    _nouvelle_ligne()
-    entetes_colonnes = ["S/N", "DESIGNATION", "GAINS", "RETENUES"]
-    for index, texte in enumerate(entetes_colonnes):
-        _texte_cellule(table_rubriques.cell(1, index), texte, gras=True, taille=9)
-
-    # -- Lignes de rubriques (S/N, désignation, gains, retenues)
-    rubriques = [
-        ("1", "Gain Heures / Hourly Wage", "{{TOTAL_HEURES}}   {{TAUX_HORAIRE}}   {{GAIN_HEURES}}", ""),
-        ("2", "Prime AP/PP / Incentive HOD/CM", "{{PRIME_AP_PP}}", ""),
-        ("3", "Surveillance/Secretariat / Invigilation", "{{SURVEILLANCE_SECRETARIAT}}", ""),
-        ("4", "Indemnite Suggestion / Duty Post Allowance", "{{INDEMNITE_SUGGESTION_ADMIN}}", ""),
-        ("5", "Taxe / Tax", "", "{{TAXE_5}}"),
-        ("6", "Retenue Amicale / Social Deduction", "", "{{RETENUE_AMICALE}}"),
-        ("7", "Dette / Debt", "", "{{DETTE}}"),
-    ]
-    for sn, designation, gains, retenues in rubriques:
-        _nouvelle_ligne()
-        indice = table_rubriques.rows.__len__() - 1
-        _texte_cellule(table_rubriques.cell(indice, 0), sn, taille=9)
-        _texte_cellule(table_rubriques.cell(indice, 1), designation, taille=9, centre=False, gras=True)
-        _texte_cellule(table_rubriques.cell(indice, 2), gains, taille=9)
-        _texte_cellule(table_rubriques.cell(indice, 3), retenues, taille=9)
-
-    # -- Ligne Total (agrégat déjà calculé, cf. services/bulletin_service.py)
-    _nouvelle_ligne()
-    indice_total = table_rubriques.rows.__len__() - 1
-    cellule_label_total = _fusionner_ligne(table_rubriques, indice_total, 0, 1)
-    _texte_cellule(cellule_label_total, "Total", gras=True, taille=9, couleur=BLANC, centre=False)
-    _ombrer_cellule(cellule_label_total, VERT_BARRE)
-    cellule_total_gains = table_rubriques.cell(indice_total, 2)
-    _texte_cellule(cellule_total_gains, "{{TOTAL_GAINS}}", gras=True, taille=9, couleur=BLANC)
-    _ombrer_cellule(cellule_total_gains, VERT_BARRE)
-    cellule_total_retenues = table_rubriques.cell(indice_total, 3)
-    _texte_cellule(cellule_total_retenues, "{{TOTAL_RETENUES}}", gras=True, taille=9, couleur=BLANC)
-    _ombrer_cellule(cellule_total_retenues, VERT_BARRE)
-
-    # -- Ligne NET A PAYER
-    _nouvelle_ligne()
-    indice_net = table_rubriques.rows.__len__() - 1
-    cellule_label_net = _fusionner_ligne(table_rubriques, indice_net, 0, 1)
-    _texte_cellule(cellule_label_net, "NET A PAYER", gras=True, taille=10, couleur=BLANC, centre=False)
-    _ombrer_cellule(cellule_label_net, VERT_BARRE)
-    cellule_lettres = table_rubriques.cell(indice_net, 2)
-    _texte_cellule(cellule_lettres, "{{NET_EN_LETTRES}}", gras=True, taille=9, couleur=BLANC, centre=False)
-    _ombrer_cellule(cellule_lettres, VERT_BARRE)
-    cellule_net_numerique = table_rubriques.cell(indice_net, 3)
-    _texte_cellule(cellule_net_numerique, "{{NET_A_PERÇEVOIR}}", gras=True, taille=10, couleur=BLANC)
-    _ombrer_cellule(cellule_net_numerique, VERT_BARRE)
-
-    document.add_paragraph()
-
-    # -------------------------------------------------------------
-    # Bloc date / signature
-    # -------------------------------------------------------------
-    p_date = document.add_paragraph()
-    p_date.alignment = WD_ALIGN_PARAGRAPH.CENTER
-    run_date = p_date.add_run(
-        f"Done at {LIEU_SIGNATURE} on the / Fait à {LIEU_SIGNATURE} le: {{{{DATE_GENERATION}}}}"
-    )
-    run_date.bold = True
-    run_date.font.size = Pt(10)
-    run_date.font.name = "Times New Roman"
-
-    for _ in range(3):
-        document.add_paragraph()
-
-    p_signature = document.add_paragraph()
-    p_signature.alignment = WD_ALIGN_PARAGRAPH.CENTER
-    run_signature = p_signature.add_run(TITRE_SIGNATAIRE_FR)
-    run_signature.bold = True
-    run_signature.font.size = Pt(10)
-    run_signature.font.name = "Times New Roman"
-
-    p_signature_en = document.add_paragraph()
-    p_signature_en.alignment = WD_ALIGN_PARAGRAPH.CENTER
-    run_signature_en = p_signature_en.add_run(TITRE_SIGNATAIRE_EN)
-    run_signature_en.bold = True
-    run_signature_en.font.size = Pt(10)
-    run_signature_en.font.name = "Times New Roman"
-
-    document.save(CHEMIN_TEMPLATE)
+    """Construit templates/bulletin_template.docx (modèle Word standard)."""
+    construire_document("word").save(CHEMIN_TEMPLATE)
     return CHEMIN_TEMPLATE
 
 
+def construire_modele_pdf() -> Path:
+    """
+    Construit templates/bulletin_modele_standard.pdf et sa description
+    templates/bulletin_modele_standard.json.
+
+    Le PDF est le bulletin standard rempli avec les valeurs du bulletin
+    officiel (variante « exemple »), converti par LibreOffice. Les zones
+    à remplacer sont repérées par la détection automatique utilisée pour
+    les bulletins importés (utils/detection_bulletin.py) ; toutes les
+    balises attendues doivent être trouvées, sinon la construction échoue.
+
+    Réservé au développeur : LibreOffice n'est pas requis sur le poste
+    de l'établissement, les deux fichiers produits sont livrés avec
+    l'application.
+    """
+    import json
+
+    from exports import pdf_export
+    from utils.detection_bulletin import suggerer_correspondances
+
+    executable = shutil.which("soffice") or shutil.which("libreoffice")
+    if executable is None:
+        candidat = Path(os.environ.get("ProgramFiles", r"C:\Program Files")) / "LibreOffice" / "program" / "soffice.exe"
+        executable = str(candidat) if candidat.exists() else None
+    if executable is None:
+        raise RuntimeError("LibreOffice est nécessaire pour construire le modèle PDF standard.")
+    with tempfile.TemporaryDirectory() as dossier:
+        source = Path(dossier) / "bulletin_modele_standard.docx"
+        construire_document("exemple").save(source)
+        subprocess.run(
+            [executable, "--headless", "--convert-to", "pdf", "--outdir", dossier, str(source)],
+            check=True, capture_output=True, timeout=180,
+        )
+        contenu = (Path(dossier) / "bulletin_modele_standard.pdf").read_bytes()
+
+    segments = pdf_export.segments_pdf(contenu)
+    propositions = suggerer_correspondances(segments)
+    attendues = set(BALISES_MODELE_PDF_STANDARD)
+    trouvees = set(propositions.values())
+    if trouvees != attendues:
+        raise RuntimeError(f"Détection incomplète du modèle standard : manquent {sorted(attendues - trouvees)}")
+    zones = [pdf_export.zone_depuis_segment(s, propositions[s.id]).to_dict() for s in segments if s.id in propositions]
+    CHEMIN_MODELE_PDF.write_bytes(contenu)
+    CHEMIN_ZONES_PDF.write_text(json.dumps(zones, ensure_ascii=False, indent=1), encoding="utf-8")
+    return CHEMIN_MODELE_PDF
+
+
 if __name__ == "__main__":
-    chemin = construire_template()
-    print(f"Template créé : {chemin}")
+    if "--etablissement" in sys.argv:
+        utiliser_version_etablissement()
+    print(f"Modèle Word créé : {construire_template()}")
+    if "--pdf" in sys.argv:
+        print(f"Modèle PDF créé : {construire_modele_pdf()}")

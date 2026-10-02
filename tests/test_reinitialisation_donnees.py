@@ -546,7 +546,7 @@ def test_audit_de_reinitialisation_complet_et_sans_secret(env):
         assert secret not in textes_audit
 
 
-def test_audit_de_securite_conserve_historique_metier_supprime(env):
+def test_journal_d_audit_conserve_en_entier(env):
     db = env["db"]
     admin, _, _ = _creer_comptes(db)
     auth_service.connecter("admin.paie", MDP_ADMIN, db_path=db)
@@ -554,14 +554,18 @@ def test_audit_de_securite_conserve_historique_metier_supprime(env):
     _peupler_donnees_metier(env)
     connexions_avant = len(_entrees_audit(db, TypeActionAudit.CONNEXION_REUSSIE))
     echecs_avant = len(_entrees_audit(db, TypeActionAudit.CONNEXION_ECHOUEE))
-    assert _entrees_audit(db, TypeActionAudit.GENERATION_BULLETIN)
+    bulletins_avant = len(_entrees_audit(db, TypeActionAudit.GENERATION_BULLETIN))
+    alertes_avant = len(_entrees_audit(db, TypeActionAudit.ALERTE_CREEE))
+    assert bulletins_avant
 
     assert _reinitialiser(env, admin.id).reussie
 
     assert len(_entrees_audit(db, TypeActionAudit.CONNEXION_REUSSIE)) == connexions_avant
     assert len(_entrees_audit(db, TypeActionAudit.CONNEXION_ECHOUEE)) == echecs_avant
-    assert not _entrees_audit(db, TypeActionAudit.GENERATION_BULLETIN)
-    assert not _entrees_audit(db, TypeActionAudit.ALERTE_CREEE)
+    # L'historique métier n'est pas effacé : un administrateur ne peut pas
+    # faire disparaître la trace des bulletins générés ou des alertes.
+    assert len(_entrees_audit(db, TypeActionAudit.GENERATION_BULLETIN)) == bulletins_avant
+    assert len(_entrees_audit(db, TypeActionAudit.ALERTE_CREEE)) == alertes_avant
 
 
 def test_echec_journalise(env, monkeypatch):

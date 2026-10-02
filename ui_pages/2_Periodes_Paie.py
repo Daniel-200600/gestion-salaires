@@ -30,6 +30,13 @@ from services.periode_service import (
 )
 from utils.formatters import LIBELLES_STATUT_PERIODE, NOMS_MOIS, libelle_statut_periode
 from utils.ui_helpers import badge_statut_periode
+from services.parametres_paie_service import (
+    ParametrePaieError,
+    formater_taux,
+    obtenir_taux_taxe_defaut,
+    taux_periode_modifiable,
+    taux_vers_pourcentage,
+)
 from services import administration_service
 from services.autorisation_service import AutorisationRefuseeError
 from utils.session_auth import exiger_permission, utilisateur_courant_id, utilisateur_courant_role
@@ -42,6 +49,7 @@ exiger_permission(permission_service.PERIODE_CONSULTER)
 role_courant = utilisateur_courant_role()
 peut_gerer_periode = permission_service.a_permission(role_courant, permission_service.PERIODE_GERER)
 peut_supprimer_periode = permission_service.a_permission(role_courant, permission_service.PERIODE_SUPPRIMER)
+peut_regler_taux = permission_service.a_permission(role_courant, permission_service.PARAMETRES_PAIE_GERER)
 
 st.title("Gestion des périodes de paie")
 
@@ -65,7 +73,11 @@ with st.expander("Créer une période", expanded=False):
             )
 
         mois_numero = NOMS_MOIS.index(mois_libelle) + 1
-        st.caption(f"Libellé généré automatiquement : **{mois_libelle} {int(annee)}**")
+        st.caption(
+            f"Libellé généré automatiquement : **{mois_libelle} {int(annee)}** · "
+            f"taux de taxe appliqué : **{formater_taux(obtenir_taux_taxe_defaut())}** "
+            "(taux par défaut, réglable dans Administration › Paramètres)"
+        )
 
         soumis = st.form_submit_button("Créer la période", disabled=not peut_gerer_periode)
 
@@ -111,6 +123,7 @@ else:
             "Mois": p.mois,
             "Année": p.annee,
             "Statut": libelle_statut_periode(p.statut),
+            "Taux de taxe": formater_taux(p.taux_taxe),
             "Date de création": p.date_creation,
             "Date de clôture": p.date_cloture or "—",
         }
@@ -135,6 +148,29 @@ else:
     periode_selectionnee = obtenir_periode(periode_id)
 
     st.markdown(f"Statut actuel : {badge_statut_periode(periode_selectionnee.statut)}", unsafe_allow_html=True)
+
+    # --- Taux de taxe de la période -------------------------------------
+    if taux_periode_modifiable(periode_selectionnee):
+        st.write(f"Taux de taxe de la période : **{formater_taux(periode_selectionnee.taux_taxe)}** "
+                 "(modifiable jusqu'à la validation, puis figé).")
+        if peut_regler_taux:
+            with st.form(f"form_taux_{periode_id}"):
+                pourcentage = st.number_input(
+                    "Taux de taxe de cette période (%)", min_value=0.0, max_value=50.0, step=0.5, format="%.2f",
+                    value=float(taux_vers_pourcentage(periode_selectionnee.taux_taxe)),
+                )
+                if st.form_submit_button("Appliquer ce taux à la période"):
+                    try:
+                        administration_service.definir_taux_taxe_periode(
+                            utilisateur_courant_id(), periode_id, f"{pourcentage:.2f}"
+                        )
+                        st.success("Taux de taxe de la période mis à jour.")
+                        st.rerun()
+                    except (ParametrePaieError, AutorisationRefuseeError) as erreur:
+                        st.error(str(erreur))
+    else:
+        st.write(f"Taux de taxe de la période : **{formater_taux(periode_selectionnee.taux_taxe)}** "
+                 "(figé : période validée ou clôturée).")
 
     if periode_selectionnee.statut == StatutPeriode.BROUILLON:
         col_ouvrir, col_modifier = st.columns(2)

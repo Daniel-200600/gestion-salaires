@@ -65,6 +65,19 @@ def nom_mois(mois: int) -> str:
     return NOMS_MOIS[mois - 1]
 
 
+NOMS_MOIS_ANGLAIS = [
+    "January", "February", "March", "April", "May", "June",
+    "July", "August", "September", "October", "November", "December",
+]
+
+
+def libelle_periode_anglais(mois: int, annee: int) -> str:
+    """Libellé de période du bulletin officiel (bilingue) : 7, 2026 -> « JULY 2026 »."""
+    if not isinstance(mois, int) or not 1 <= mois <= 12:
+        raise ValueError("Le mois doit être un entier compris entre 1 et 12.")
+    return f"{NOMS_MOIS_ANGLAIS[mois - 1].upper()} {annee}"
+
+
 def sexe_depuis_libelle(libelle: str) -> Sexe:
     return _SEXE_DEPUIS_LIBELLE[libelle]
 
@@ -105,3 +118,14 @@ def nettoyer_nom_fichier(valeur: str) -> str:
     nettoye = nettoye.replace(" ", "_")
     nettoye = nettoye.rstrip(" .")
     return nettoye or "sans_nom"
+
+
+def formater_taux_taxe(taux) -> str:
+    """Taux de taxe (fraction) en pourcentage lisible : Decimal("0.055") -> « 5,5 % »."""
+    from decimal import Decimal
+
+    pourcentage = (Decimal(str(taux)) * 100).normalize()
+    texte = format(pourcentage, "f")
+    if "." in texte:
+        texte = texte.rstrip("0").rstrip(".")
+    return f"{texte.replace('.', ',')} %"

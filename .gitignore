@@ -28,3 +28,11 @@ logs/
 *.pem
 *.key
 .streamlit/secrets.toml
+
+# Everything the application writes at runtime (backups, exports, imported
+# and school-specific bulletin templates) -- never commit
+data/
+
+# School-specific header and logo (see config/etablissement_local.example.py)
+config/etablissement_local.py
+assets/logo_etablissement.png

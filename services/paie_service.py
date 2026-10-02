@@ -11,8 +11,11 @@ FORMULES (dans cet ordre)
 2. Gain heures        = total_heures × taux_horaire
 3. Base taxable        = gain_heures + prime_ap_pp + surveillance_secretariat
                           + indemnite_suggestion_admin
-4. Taxe 5 %             = base_taxable × TAUX_TAXE (centralisé dans
-                          config.settings.TAUX_TAXE, jamais un 0.05 en dur)
+4. Taxe                 = base_taxable × taux de taxe de la période
+                          (periodes_paie.taux_taxe : 5 % par défaut,
+                          config.settings.TAUX_TAXE ; paramétrable par
+                          l'administrateur, figé à la validation — cf.
+                          services/parametres_paie_service.py)
 5. Net à percevoir      = base_taxable - taxe_5 - retenue_amicale - dette
 
 PRÉCISION MONÉTAIRE
@@ -150,7 +153,7 @@ def calculer_paie_enseignant(periode_id: int, enseignant_id: int, db_path: DbPat
     remuneration = remuneration_service.obtenir_remuneration_enseignant(periode_id, enseignant_id, db_path=db_path)
     retenues = retenue_service.obtenir_retenues_enseignant(periode_id, enseignant_id, db_path=db_path)
 
-    return _calculer_resultat(periode.id, enseignant, heures, remuneration, retenues)
+    return _calculer_resultat(periode.id, enseignant, heures, remuneration, retenues, taux_taxe=periode.taux_taxe)
 
 
 def _calculer_resultat(
@@ -159,6 +162,7 @@ def _calculer_resultat(
     heures: Dict[int, float],
     remuneration: Dict[str, int],
     retenues: Dict[str, int],
+    taux_taxe: Decimal = TAUX_TAXE,
 ) -> ResultatPaie:
     """
     Applique les 5 formules officielles à des données déjà lues.
@@ -188,8 +192,9 @@ def _calculer_resultat(
     )
     base_taxable = arrondir_fcfa(base_taxable_decimal)
 
-    # 4. Taxe 5 % (taux centralisé dans config.settings.TAUX_TAXE)
-    taxe_decimal = base_taxable_decimal * TAUX_TAXE
+    # 4. Taxe (taux propre à la période ; 5 % par défaut = config.settings.TAUX_TAXE)
+    taux_taxe = Decimal(str(taux_taxe))
+    taxe_decimal = base_taxable_decimal * taux_taxe
     taxe_5 = arrondir_fcfa(taxe_decimal)
 
     retenue_amicale = int(retenues.get("retenue_amicale", 0))
@@ -222,6 +227,7 @@ def _calculer_resultat(
         retenue_amicale=retenue_amicale,
         dette=dette,
         net_a_percevoir=net_a_percevoir,
+        taux_taxe=taux_taxe,
     )
 
 

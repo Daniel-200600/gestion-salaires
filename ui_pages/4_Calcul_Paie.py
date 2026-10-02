@@ -16,6 +16,8 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 import streamlit as st
 
+from utils.formatters import formater_taux_taxe
+
 from database.initialization import init_database
 from models.enums import StatutPeriode
 from services import enseignant_service, heures_service, periode_service, remuneration_service, retenue_service
@@ -123,7 +125,7 @@ if st.button("Lancer le calcul", type="primary"):
             "Prime AP/PP": formater_fcfa(r.prime_ap_pp),
             "Surveillance/Secrétariat": formater_fcfa(r.surveillance_secretariat),
             "Indemnité suggestion/admin": formater_fcfa(r.indemnite_suggestion_admin),
-            "Taxe 5 %": formater_fcfa(r.taxe_5),
+            "Taxe": formater_fcfa(r.taxe_5),
             "Retenue amicale": formater_fcfa(r.retenue_amicale),
             "Dette": formater_fcfa(r.dette),
             "Net à percevoir": formater_fcfa(r.net_a_percevoir),
@@ -144,6 +146,6 @@ if st.button("Lancer le calcul", type="primary"):
     col3.metric("Total primes", formater_fcfa(totaux.total_primes))
 
     col4, col5, col6 = st.columns(3)
-    col4.metric("Total taxe (5 %)", formater_fcfa(totaux.total_taxe))
+    col4.metric(f"Total taxe ({formater_taux_taxe(periode.taux_taxe)})", formater_fcfa(totaux.total_taxe))
     col5.metric("Total retenues", formater_fcfa(totaux.total_retenues))
     col6.metric("Total net à percevoir", formater_fcfa(totaux.total_net_a_percevoir))

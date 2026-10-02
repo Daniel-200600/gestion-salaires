@@ -1,8 +1,9 @@
 """
 Service bulletin (module 07).
 
-Prépare les données consommées par le générateur Word
-(exports/word_export.py), exclusivement à partir des résultats déjà
+Prépare les données consommées par le générateur de bulletins — Word
+(exports/word_export.py) ou PDF (exports/pdf_export.py) selon le modèle
+actif (services/modele_bulletin_service.py) — exclusivement à partir des résultats déjà
 calculés par le moteur de paie (services/paie_service.py).
 
 RÈGLE ABSOLUE : ce service ne recalcule JAMAIS gain_heures, taxe_5 ou
@@ -26,7 +27,7 @@ PROTECTION DE L'HISTORIQUE
 """
 
 import zipfile
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from datetime import datetime
 from pathlib import Path
 from typing import Dict, List, Optional, Union
@@ -35,20 +36,26 @@ from docx import Document
 
 from database.repositories import bulletin_repository
 from exports.excel_export import chemin_sortie_disponible
+from exports.pdf_export import PdfExportError, texte_pdf
 from exports.word_export import (
     EXPORT_DIR_BULLETINS,
     generer_document_bulletin,
     generer_nom_fichier_bulletin,
     sauvegarder_document,
+    texte_document,
 )
 from models.bulletin_paie import BulletinPaie
 from models.enums import StatutPeriode
+from models.periode_paie import PeriodePaie
 from models.resultat_paie import ResultatPaie
 from services.paie_service import CalculPaieError, calculer_paie_enseignant
-from utils.formatters import nettoyer_nom_fichier
+from utils.formatters import libelle_periode_anglais, libelle_statut, nettoyer_nom_fichier
 from utils.montant_en_lettres import montant_en_lettres
 
 DbPath = Optional[Union[str, Path]]
+
+# Un bulletin est produit au format du modèle actif (services/modele_bulletin_service.py).
+EXTENSIONS_BULLETIN = (".docx", ".pdf")
 
 
 class BulletinServiceError(Exception):
@@ -92,11 +99,16 @@ def _formater_heures(valeur: float) -> str:
     return f"{valeur:g}"
 
 
-def _preparer_valeurs_placeholder(resultat: ResultatPaie, libelle_periode: str) -> Dict[str, str]:
+def _preparer_valeurs_placeholder(resultat: ResultatPaie, periode: Union[PeriodePaie, str]) -> Dict[str, str]:
     """
-    Construit le dict {placeholder: valeur texte} à partir d'un
-    ResultatPaie déjà calculé par paie_service — aucune formule de
-    paie n'est recalculée ici, uniquement de la mise en forme texte.
+    Construit le dict {balise: valeur texte} à partir d'un ResultatPaie
+    déjà calculé par paie_service — aucune formule de paie n'est
+    recalculée ici, uniquement de la mise en forme texte (montants sans
+    séparateur de milliers, comme sur le bulletin officiel).
+
+    Toutes les balises de utils/balises_bulletin.py sont fournies, ainsi
+    que les noms historiques (TAXE_5, NET_A_PERÇEVOIR, DATE_GENERATION),
+    afin que tout modèle — standard ou importé — soit rempli.
     """
     # Total affiché sur la ligne "Total" du modèle : dérivé de deux
     # valeurs déjà finales (base_taxable, net_a_percevoir), pas une
@@ -104,33 +116,75 @@ def _preparer_valeurs_placeholder(resultat: ResultatPaie, libelle_periode: str) 
     total_gains = resultat.base_taxable
     total_retenues = resultat.base_taxable - resultat.net_a_percevoir
 
-    return {
-        "{{NOM}}": resultat.nom.upper(),
-        "{{PRENOM}}": resultat.prenom.upper(),
-        "{{STATUT}}": resultat.statut.value,  # déjà 'V'/'P' en base, aucune conversion de valeur
-        "{{PERIODE}}": libelle_periode.upper(),
-        "{{TOTAL_HEURES}}": _formater_heures(resultat.total_heures),
-        "{{TAUX_HORAIRE}}": str(resultat.taux_horaire),
-        "{{GAIN_HEURES}}": str(resultat.gain_heures),
-        "{{PRIME_AP_PP}}": str(resultat.prime_ap_pp),
-        "{{SURVEILLANCE_SECRETARIAT}}": str(resultat.surveillance_secretariat),
-        "{{INDEMNITE_SUGGESTION_ADMIN}}": str(resultat.indemnite_suggestion_admin),
-        "{{TAXE_5}}": str(resultat.taxe_5),
-        "{{RETENUE_AMICALE}}": str(resultat.retenue_amicale),
-        "{{DETTE}}": str(resultat.dette),
-        "{{TOTAL_GAINS}}": str(total_gains),
-        "{{TOTAL_RETENUES}}": str(total_retenues),
-        "{{NET_A_PERÇEVOIR}}": str(resultat.net_a_percevoir),
-        "{{NET_EN_LETTRES}}": montant_en_lettres(resultat.net_a_percevoir),
-        "{{DATE_GENERATION}}": datetime.now().strftime("%d/%m/%Y"),
+    if isinstance(periode, PeriodePaie):
+        libelle_fr = periode.libelle.upper()
+        libelle_en = libelle_periode_anglais(periode.mois, periode.annee)
+    else:  # compatibilité : simple libellé
+        libelle_fr = libelle_en = str(periode).upper()
+
+    from services.parametres_paie_service import formater_taux  # import local : évite un cycle
+
+    valeurs = {
+        "NOM": resultat.nom.upper(),
+        "PRENOM": resultat.prenom.upper(),
+        "NOM_COMPLET": f"{resultat.nom.upper()} {resultat.prenom.upper()}",
+        "STATUT": resultat.statut.value,  # déjà 'V'/'P' en base, aucune conversion de valeur
+        "STATUT_LIBELLE": libelle_statut(resultat.statut),
+        # Le bulletin officiel (bilingue) affiche le mois en anglais : « JULY 2026 ».
+        "PERIODE": libelle_en,
+        "PERIODE_FR": libelle_fr,
+        "DATE": datetime.now().strftime("%d/%m/%Y"),
+        "TOTAL_HEURES": _formater_heures(resultat.total_heures),
+        "SEMAINE_1": _formater_heures(resultat.semaine_1),
+        "SEMAINE_2": _formater_heures(resultat.semaine_2),
+        "SEMAINE_3": _formater_heures(resultat.semaine_3),
+        "SEMAINE_4": _formater_heures(resultat.semaine_4),
+        "SEMAINE_5": _formater_heures(resultat.semaine_5),
+        "TAUX_HORAIRE": str(resultat.taux_horaire),
+        "GAIN_HEURES": str(resultat.gain_heures),
+        "PRIME_AP_PP": str(resultat.prime_ap_pp),
+        "SURVEILLANCE_SECRETARIAT": str(resultat.surveillance_secretariat),
+        "INDEMNITE_SUGGESTION_ADMIN": str(resultat.indemnite_suggestion_admin),
+        "TOTAL_GAINS": str(total_gains),
+        "BASE_TAXABLE": str(resultat.base_taxable),
+        "TAXE": str(resultat.taxe_5),
+        "TAXE_TAUX": formater_taux(resultat.taux_taxe),
+        "RETENUE_AMICALE": str(resultat.retenue_amicale),
+        "DETTE": str(resultat.dette),
+        "TOTAL_RETENUES": str(total_retenues),
+        "NET_A_PAYER": str(resultat.net_a_percevoir),
+        "NET_EN_LETTRES": montant_en_lettres(resultat.net_a_percevoir),
     }
+    valeurs["TAXE_5"] = valeurs["TAXE"]
+    valeurs["NET_A_PERÇEVOIR"] = valeurs["NET_A_PAYER"]
+    valeurs["NET_A_PERCEVOIR"] = valeurs["NET_A_PAYER"]
+    valeurs["DATE_GENERATION"] = valeurs["DATE"]
+    return {"{{" + cle + "}}": valeur for cle, valeur in valeurs.items()}
+
+
+def _statut_fige(resultat: ResultatPaie, periode: PeriodePaie, db_path: DbPath) -> ResultatPaie:
+    """
+    Pour une période validée ou clôturée dont le bulletin a déjà été
+    enregistré (instantané bulletins_paie), le statut affiché reste celui
+    de l'instantané : un changement de statut de l'enseignant (Vacataire
+    -> Permanent, par exemple) ne modifie jamais un bulletin déjà émis.
+    """
+    if periode.statut not in (StatutPeriode.VALIDEE, StatutPeriode.CLOTUREE):
+        return resultat
+    for instantane in bulletin_repository.lister_par_periode(periode.id, db_path=db_path):
+        if instantane.enseignant_id == resultat.enseignant_id and instantane.statut_snapshot != resultat.statut:
+            return replace(resultat, statut=instantane.statut_snapshot)
+    return resultat
 
 
 def _bulletin_existe_deja(resultat: ResultatPaie, libelle_periode: str) -> Optional[Path]:
-    """Vérifie si un bulletin a déjà été généré (nom de base, sans suffixe de version) pour cet enseignant/période."""
-    nom_fichier = generer_nom_fichier_bulletin(resultat.nom, resultat.prenom, libelle_periode)
-    chemin = _dossier_periode(libelle_periode) / nom_fichier
-    return chemin if chemin.exists() else None
+    """Vérifie si un bulletin (Word ou PDF) a déjà été généré (nom de base, sans suffixe de version) pour cet enseignant/période."""
+    for extension in EXTENSIONS_BULLETIN:
+        nom_fichier = generer_nom_fichier_bulletin(resultat.nom, resultat.prenom, libelle_periode, extension)
+        chemin = _dossier_periode(libelle_periode) / nom_fichier
+        if chemin.exists():
+            return chemin
+    return None
 
 
 def _valider_bulletin_genere(chemin: Path, resultat: ResultatPaie, libelle_periode: str) -> None:
@@ -178,18 +232,21 @@ def _valider_bulletin_genere(chemin: Path, resultat: ResultatPaie, libelle_perio
     if resultat.net_a_percevoir is None:
         _echec("le net à percevoir est manquant.")
 
-    try:
-        document_verification = Document(chemin)
-    except Exception as erreur:  # noqa: BLE001 — toute erreur d'ouverture invalide le contrôle 9
-        _echec(f"le fichier .docx généré n'est pas un document valide ({erreur}).")
-        return
-
-    textes = [p.text for p in document_verification.paragraphs]
-    for table in document_verification.tables:
-        for ligne in table.rows:
-            for cellule in ligne.cells:
-                textes.extend(p.text for p in cellule.paragraphs)
-    contenu = " ".join(textes)
+    if chemin.suffix.lower() == ".pdf":
+        try:
+            contenu = texte_pdf(chemin.read_bytes())
+        except PdfExportError as erreur:
+            _echec(f"le fichier PDF généré n'est pas un document valide ({erreur}).")
+            return
+        if str(resultat.net_a_percevoir) not in contenu:
+            _echec("le net à payer n'apparaît pas dans le bulletin PDF.")
+    else:
+        try:
+            document_verification = Document(chemin)
+        except Exception as erreur:  # noqa: BLE001 — toute erreur d'ouverture invalide le contrôle 9
+            _echec(f"le fichier .docx généré n'est pas un document valide ({erreur}).")
+            return
+        contenu = texte_document(document_verification)
     if "{{" in contenu or "}}" in contenu:
         _echec("un placeholder non remplacé subsiste dans le document.")
 
@@ -225,6 +282,8 @@ def generer_bulletin_enseignant(
     from database.repositories import periode_repository  # import local : évite un cycle au chargement du module
     periode = periode_repository.obtenir_par_id(periode_id, db_path=db_path)
 
+    resultat = _statut_fige(resultat, periode, db_path)
+
     bulletin_existant = _bulletin_existe_deja(resultat, periode.libelle)
     if periode.statut == StatutPeriode.CLOTUREE and bulletin_existant is not None:
         raise BulletinServiceError(
@@ -233,14 +292,24 @@ def generer_bulletin_enseignant(
             "période clôturée."
         )
 
-    valeurs = _preparer_valeurs_placeholder(resultat, periode.libelle)
-    document = generer_document_bulletin(valeurs)
+    valeurs = _preparer_valeurs_placeholder(resultat, periode)
+    from services import modele_bulletin_service  # import local : évite un cycle au chargement du module
+    modele = modele_bulletin_service.obtenir_modele_actif(db_path=db_path)
 
-    nom_fichier = generer_nom_fichier_bulletin(resultat.nom, resultat.prenom, periode.libelle)
+    nom_fichier = generer_nom_fichier_bulletin(resultat.nom, resultat.prenom, periode.libelle, modele.extension)
     dossier = _dossier_periode(periode.libelle)
     # Jamais d'écrasement silencieux (hors période clôturée déjà bloquée ci-dessus) : versionné automatiquement.
     chemin = chemin_sortie_disponible(nom_fichier, dossier=dossier)
-    sauvegarder_document(document, chemin)
+    if modele.format == "pdf":
+        try:
+            contenu = modele_bulletin_service.produire("pdf", modele.contenu(), modele.zones, valeurs)
+        except modele_bulletin_service.ModeleBulletinError as erreur:
+            raise BulletinServiceError(f"Modèle « {modele.nom} » : {erreur}") from erreur
+        chemin.parent.mkdir(parents=True, exist_ok=True)
+        chemin.write_bytes(contenu)
+    else:
+        document = generer_document_bulletin(valeurs, template_path=modele.chemin)
+        sauvegarder_document(document, chemin)
 
     _valider_bulletin_genere(chemin, resultat, periode.libelle)
 
@@ -277,7 +346,7 @@ def generer_bulletin_enseignant(
             AuditLog(
                 type_action=TypeActionAudit.GENERATION_BULLETIN, entite="bulletin",
                 entite_id=enseignant_id, utilisateur=utilisateur,
-                details=f"{resultat.nom} {resultat.prenom} — {periode.libelle} — {chemin.name}",
+                details=f"{resultat.nom} {resultat.prenom} — {periode.libelle} — {chemin.name} — modèle : {modele.libelle}",
             ),
             db_path=db_path,
         )
@@ -335,11 +404,11 @@ def creer_archive_zip(bulletins: List[BulletinGenere], libelle_periode: str) -> 
 # ---------------------------------------------------------------------
 
 def lister_bulletins_existants(libelle_periode: str) -> List[Path]:
-    """Liste les fichiers .docx déjà présents pour une période (lecture seule du dossier d'export)."""
+    """Liste les bulletins (.docx et .pdf) déjà présents pour une période (lecture seule du dossier d'export)."""
     dossier = _dossier_periode(libelle_periode)
     if not dossier.exists():
         return []
-    return sorted(dossier.glob("Bulletin_*.docx"))
+    return sorted(p for extension in EXTENSIONS_BULLETIN for p in dossier.glob(f"Bulletin_*{extension}"))
 
 
 def bulletin_deja_genere(nom: str, prenom: str, libelle_periode: str) -> bool:

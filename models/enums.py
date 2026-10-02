@@ -83,6 +83,11 @@ class TypeActionAudit(str, Enum):
     ARCHIVE_MASSIVE = "archive_massive"
     REINITIALISATION_DONNEES = "reinitialisation_donnees"
     REINITIALISATION_DONNEES_ECHEC = "reinitialisation_donnees_echec"
+    PARAMETRE_PAIE_MODIFIE = "parametre_paie_modifie"
+    MODELE_BULLETIN_IMPORTE = "modele_bulletin_importe"
+    MODELE_BULLETIN_ACTIVE = "modele_bulletin_active"
+    MODELE_BULLETIN_SUPPRIME = "modele_bulletin_supprime"
+    STATUT_ENSEIGNANT_MODIFIE = "statut_enseignant_modifie"
 
 
 class RoleUtilisateur(str, Enum):

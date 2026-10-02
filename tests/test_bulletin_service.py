@@ -98,7 +98,11 @@ def test_statut_et_periode_injectes():
     resultat = bulletin_service.generer_bulletin_enseignant(p.id, e.id)
     texte = _lire_texte_document(resultat.chemin)
     assert "V" in texte
-    assert p.libelle.upper() in texte
+    # Adapté (reproduction du bulletin officiel de l'établissement, demandée
+    # par celui-ci) : la période y est écrite en anglais, « SEPTEMBER 2030 ».
+    # Le libellé français reste disponible via la balise {{PERIODE_FR}}.
+    from utils.formatters import libelle_periode_anglais
+    assert libelle_periode_anglais(p.mois, p.annee) in texte
 
 
 # ---------------------------------------------------------------------
@@ -136,9 +140,9 @@ def test_toutes_les_valeurs_financieres_injectees():
 # ---------------------------------------------------------------------
 
 def test_montant_en_lettres_correct():
-    e = _creer_enseignant(taux_horaire=1700)
+    e = _creer_enseignant(taux_horaire=1800)
     p = _creer_periode_ouverte()
-    _saisir_donnees(p.id, e.id, heures_par_semaine={1: 12})
+    _saisir_donnees(p.id, e.id, heures_par_semaine={1: 10})
     p = periode_service.valider_periode(p.id)
 
     resultat = bulletin_service.generer_bulletin_enseignant(p.id, e.id)
@@ -272,10 +276,13 @@ def test_bulletin_periode_ne_contient_pas_donnees_autre_periode():
     texte_p2 = _lire_texte_document(resultat_p2.chemin)
     assert "50000" not in texte_p1
     assert "10000" not in texte_p2 or "10000" in texte_p2 and "50000" not in texte_p1  # garde-fou explicite ci-dessous
-    assert p1.libelle.upper() in texte_p1
-    assert p2.libelle.upper() in texte_p2
-    assert p2.libelle.upper() not in texte_p1
-    assert p1.libelle.upper() not in texte_p2
+    # Adapté : le bulletin officiel écrit la période en anglais (« JANUARY 2031 »).
+    from utils.formatters import libelle_periode_anglais
+    libelle_p1, libelle_p2 = libelle_periode_anglais(p1.mois, p1.annee), libelle_periode_anglais(p2.mois, p2.annee)
+    assert libelle_p1 in texte_p1
+    assert libelle_p2 in texte_p2
+    assert libelle_p2 not in texte_p1
+    assert libelle_p1 not in texte_p2
 
 
 def test_enseignant_a_ne_recoit_jamais_les_donnees_de_b():

@@ -1,8 +1,4 @@
-# Gestion des Salaires — v1.0.0
-
-[![tests](https://github.com/Daniel-200600/gestion-salaires/actions/workflows/tests.yml/badge.svg)](https://github.com/Daniel-200600/gestion-salaires/actions/workflows/tests.yml)
-![Python](https://img.shields.io/badge/python-3.11-blue)
-![License](https://img.shields.io/badge/license-MIT-green)
+# Gestion des Salaires — v1.1.0
 
 Application de gestion de la paie des enseignants, développée en Python (Streamlit + SQLite) pour un établissement scolaire bilingue au Cameroun.
 
@@ -16,7 +12,11 @@ Couvre l'intégralité du cycle de paie : gestion des enseignants et des périod
 - Gestion des enseignants et des périodes de paie (cycle BROUILLON → OUVERTE → VALIDEE → CLOTUREE)
 - Calcul de paie (source unique : `services/paie_service.py`)
 - Contrôle de paie, validation, clôture
-- Génération de bulletins individuels (Word) et exports comptables (Excel)
+- Bulletins de solde identiques au bulletin officiel de l'établissement, en Word ou en PDF
+- Modèles de bulletin importables (Word ou PDF, bulletin rempli ou modèle à balises)
+- Taux de taxe paramétrable (5 % par défaut, figé par période à la validation)
+- Changement de statut d'un enseignant (vacataire / permanent), journalisé
+- Exports comptables (Excel)
 - Historique et reporting multi-périodes
 - Gestion documentaire (registre, intégrité, archivage sécurisé)
 - Import massif Excel/CSV avec validation, doublons, dry-run, transaction
@@ -43,7 +43,7 @@ utils/                  Validation, formatage, sécurité, session, documentatio
 assets/                Favicon (PNG, ICO) et logos de l'application
 tests/                  Suite de tests (voir ci-dessous)
 docs/                   Documentation (les quatre documents affichés dans l'application y sont aussi)
-templates/              Modèle de bulletin Word
+templates/              Modèles de bulletin standard (Word, PDF) et script de construction
 ```
 
 Principe respecté dans tout le projet : **Page Streamlit → Service → Repository → SQLite**, jamais d'accès SQL direct depuis une page, jamais de logique métier dans l'interface.
@@ -77,7 +77,7 @@ Sauvegarde via l'API native SQLite (`sqlite3.Connection.backup()`), jamais une s
 
 ## Version
 
-**1.0.0** — voir `config/settings.py` (`VERSION`), source unique du numéro de version.
+**1.1.0** — voir `config/settings.py` (`VERSION`), source unique du numéro de version.
 
 ## Tests
 
@@ -85,4 +85,4 @@ Sauvegarde via l'API native SQLite (`sqlite3.Connection.backup()`), jamais une s
 python -m pytest -q
 ```
 
-Résultat de référence : **1392 passed, 3 skipped** (version améliorée ; voir `docs/amelioration_professionnelle.md`).
+Résultat de référence : **1480 passed, 3 skipped** (version 1.1.0 ; voir `docs/bulletins_taxe_statut.md`).

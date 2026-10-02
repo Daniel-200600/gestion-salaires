@@ -230,13 +230,17 @@ def _afficher_ecran_bienvenue() -> None:
         "contrôle puis clôture des périodes de paie."
     )
 
-    taux = f"{float(TAUX_TAXE) * 100:g} %"
+    try:
+        from services.parametres_paie_service import formater_taux, obtenir_taux_taxe_defaut
+        taux = formater_taux(obtenir_taux_taxe_defaut())
+    except Exception:  # noqa: BLE001 — écran d'accueil : jamais bloquant (base pas encore initialisée)
+        taux = f"{float(TAUX_TAXE) * 100:g} %"
     fonctions = [
         ("Saisie et calcul",
          f"Heures hebdomadaires, taux horaire, primes, indemnités et retenues. Calcul du net à payer "
-         f"avec application de la taxe de {taux}."),
+         f"avec application de la taxe ({taux} par défaut, taux réglable par l'administrateur)."),
         ("Bulletins et états",
-         "Bulletins de solde au format Word. États comptables, rapports et statistiques exportables "
+         "Bulletins de solde au format Word ou PDF, fidèles au modèle de l'établissement. États comptables, rapports et statistiques exportables "
          "au format Excel."),
         ("Contrôle et clôture",
          "Détection des anomalies avant validation. Une période clôturée n'est plus modifiable."),

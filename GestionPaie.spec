@@ -30,6 +30,9 @@ donnees_incluses = [
     (str(RACINE / "app.py"), "."),
     (str(RACINE / "ui_pages"), "ui_pages"),
     (str(RACINE / "templates" / "bulletin_template.docx"), "templates"),
+    # Modèle PDF standard du bulletin et description de ses zones.
+    (str(RACINE / "templates" / "bulletin_modele_standard.pdf"), "templates"),
+    (str(RACINE / "templates" / "bulletin_modele_standard.json"), "templates"),
     (str(RACINE / "database" / "schema.sql"), "database"),
     # Identité visuelle : favicon, logo (affichés dans le navigateur).
     (str(RACINE / "assets"), "assets"),
@@ -57,6 +60,8 @@ analyse = Analysis(
         "openpyxl",
         "docx",
         "pandas",
+        # Bulletins PDF (modèles PDF importés et modèle PDF standard).
+        "pymupdf",
     ],
     hookspath=[],
     hooksconfig={},

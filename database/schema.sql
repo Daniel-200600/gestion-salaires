@@ -77,6 +77,12 @@ CREATE TABLE IF NOT EXISTS periodes_paie (
                         CHECK (statut IN ('brouillon', 'ouverte', 'validee', 'cloturee')),
     date_creation   TEXT    NOT NULL DEFAULT (datetime('now')),
     date_cloture    TEXT    NULL,
+    -- Taux de taxe propre à la période (fraction décimale, ex. '0.055'
+    -- pour 5,5 %). Initialisé au taux par défaut en vigueur à la création
+    -- (table parametres_paie), modifiable tant que la période n'est pas
+    -- validée, puis figé (trigger trg_periodes_paie_taux_fige).
+    taux_taxe       TEXT    NOT NULL DEFAULT '0.05'
+                        CHECK (CAST(taux_taxe AS REAL) >= 0 AND CAST(taux_taxe AS REAL) < 1),
     UNIQUE (mois, annee),
     -- date_cloture est renseignee si et seulement si la periode est CLOTUREE
     CHECK (
@@ -106,6 +112,16 @@ WHEN NOT (
 )
 BEGIN
     SELECT RAISE(ABORT, 'Transition de statut de periode invalide');
+END;
+
+-- Le taux de taxe d'une période validée ou clôturée ne peut plus changer :
+-- un bulletin validé est toujours recalculé à l'identique.
+CREATE TRIGGER IF NOT EXISTS trg_periodes_paie_taux_fige
+BEFORE UPDATE OF taux_taxe ON periodes_paie
+FOR EACH ROW
+WHEN OLD.statut IN ('validee', 'cloturee') AND NEW.taux_taxe IS NOT OLD.taux_taxe
+BEGIN
+    SELECT RAISE(ABORT, 'Taux de taxe fige : la periode est validee ou cloturee');
 END;
 
 -- Seule une période encore en brouillon peut être supprimée
@@ -378,6 +394,11 @@ CREATE TABLE IF NOT EXISTS audit_log (
                         'validation_periode',
                         'reinitialisation_donnees',
                         'reinitialisation_donnees_echec',
+                        'parametre_paie_modifie',
+                        'modele_bulletin_importe',
+                        'modele_bulletin_active',
+                        'modele_bulletin_supprime',
+                        'statut_enseignant_modifie',
                         'calcul_paie',
                         'generation_bulletin',
                         'export_comptable',
@@ -563,3 +584,35 @@ CREATE INDEX IF NOT EXISTS idx_elements_remuneration_periode ON elements_remuner
 CREATE INDEX IF NOT EXISTS idx_retenues_periode ON retenues(periode_id);
 CREATE INDEX IF NOT EXISTS idx_bulletins_periode ON bulletins_paie(periode_id);
 CREATE INDEX IF NOT EXISTS idx_enseignants_actif ON enseignants(actif);
+
+-- ---------------------------------------------------------------------
+-- Table : parametres_paie
+-- Paramètres de paie modifiables par l'administrateur (taux de taxe par
+-- défaut des nouvelles périodes, modèle de bulletin actif). Stockés en
+-- base pour être inclus dans les sauvegardes et restaurations.
+-- ---------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS parametres_paie (
+    cle                 TEXT    PRIMARY KEY,
+    valeur              TEXT    NOT NULL,
+    date_modification   TEXT    NOT NULL DEFAULT (datetime('now')),
+    utilisateur         TEXT    NULL
+);
+
+-- ---------------------------------------------------------------------
+-- Table : modeles_bulletin
+-- Modèles de bulletin importés (Word .docx ou PDF). Le fichier est
+-- conservé dans data/modeles_bulletin/ ; `correspondances` contient,
+-- en JSON, les zones à remplacer (modèles PDF) ou la liste des balises
+-- détectées (modèles Word).
+-- ---------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS modeles_bulletin (
+    id                      INTEGER PRIMARY KEY AUTOINCREMENT,
+    nom                     TEXT    NOT NULL,
+    format                  TEXT    NOT NULL CHECK (format IN ('docx', 'pdf')),
+    nom_fichier             TEXT    NOT NULL UNIQUE,
+    nom_fichier_origine     TEXT    NOT NULL,
+    empreinte               TEXT    NOT NULL,
+    correspondances         TEXT    NOT NULL DEFAULT '[]',
+    date_import             TEXT    NOT NULL DEFAULT (datetime('now')),
+    utilisateur             TEXT    NULL
+);

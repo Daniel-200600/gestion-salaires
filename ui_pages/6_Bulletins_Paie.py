@@ -1,5 +1,5 @@
 """
-Page Streamlit — Module 07 : Bulletins de solde Word.
+Page Streamlit — Module 07 : Bulletins de solde (Word ou PDF selon le modèle actif).
 
 Règle d'architecture stricte : cette page ne contient AUCUNE requête
 SQL et AUCUNE formule de calcul de salaire, et ne génère AUCUN document
@@ -16,7 +16,7 @@ import streamlit as st
 
 from database.initialization import init_database
 from models.enums import StatutPeriode
-from services import enseignant_service, periode_service
+from services import enseignant_service, modele_bulletin_service, periode_service
 from services.bulletin_service import BulletinServiceError, creer_archive_zip, generer_bulletins_groupe
 from services.controle_paie_service import controler_periode
 from services.paie_service import CalculPaieError, calculer_paie_groupe
@@ -25,13 +25,23 @@ from utils.formatters import formater_fcfa, libelle_statut_periode
 init_database()
 
 
+def _mime(chemin: Path) -> str:
+    if chemin.suffix.lower() == ".pdf":
+        return "application/pdf"
+    return "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+
+
 from services import permission_service
 from utils.session_auth import exiger_permission, utilisateur_courant_role
 
 exiger_permission(permission_service.BULLETIN_CONSULTER)
 peut_generer_bulletin = permission_service.a_permission(utilisateur_courant_role(), permission_service.BULLETIN_GENERER)
-st.title("Génération des bulletins de solde (Word)")
-st.caption("Génère un bulletin Word individuel par enseignant, à partir des résultats déjà calculés par le moteur de paie.")
+st.title("Génération des bulletins de solde")
+modele_actif = modele_bulletin_service.obtenir_modele_actif()
+st.caption(
+    "Génère un bulletin individuel par enseignant, à partir des résultats déjà calculés par le moteur de paie. "
+    f"Modèle utilisé : {modele_actif.libelle} (choix du modèle : Administration › Modèles de bulletin)."
+)
 
 # =======================================================================
 # 1. Sélection de la période
@@ -190,7 +200,7 @@ if bulletins_generes:
                 f"Télécharger le bulletin ({bulletin.chemin.name})",
                 data=fichier.read(),
                 file_name=bulletin.chemin.name,
-                mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                mime=_mime(bulletin.chemin),
             )
     else:
         libelle_periode = st.session_state.get("derniere_periode_libelle", periode.libelle)
@@ -213,6 +223,6 @@ if bulletins_generes:
                         f"{bulletin.chemin.name}",
                         data=fichier.read(),
                         file_name=bulletin.chemin.name,
-                        mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                        mime=_mime(bulletin.chemin),
                         key=f"telechargement_{bulletin.enseignant_id}",
                     )

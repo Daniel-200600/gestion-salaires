@@ -1,53 +1,48 @@
-# Matrice de correspondance — Bulletin de solde Word (Module 07)
+# Matrice de correspondance — Bulletin de solde
 
-Correspondance exacte entre le modèle de bulletin de l'établissement, les
-classes/champs réels du projet, et les placeholders du template.
+Correspondance entre le bulletin officiel de l'établissement, les champs
+calculés par l'application et les balises des modèles de bulletin.
+Liste complète et à jour : `utils/balises_bulletin.py` (affichée dans
+Administration › Modèles de bulletin).
 
 ## Champs variables
 
-| Champ du modèle | Source (classe.champ réel) | Service intermédiaire | Placeholder Word |
-|---|---|---|---|
-| Nom | `Enseignant.nom` | `ResultatPaie.nom` (via `paie_service.calculer_paie_enseignant`) | `{{NOM}}` |
-| Prénom | `Enseignant.prenom` | `ResultatPaie.prenom` | `{{PRENOM}}` |
-| Statut (V/P) | `Enseignant.statut` (`StatutEnseignant`, déjà `"V"`/`"P"` en base — aucune conversion de valeur, uniquement lecture de `.value`) | `ResultatPaie.statut` | `{{STATUT}}` |
-| Période | `PeriodePaie.libelle` | lu directement depuis `periode_repository.obtenir_par_id` dans `bulletin_service` | `{{PERIODE}}` |
-| Semaine 1 à 5 | `SaisieHeures.heures_effectuees` (par `numero_semaine`) | `ResultatPaie.semaine_1` … `semaine_5` | *(non affichées individuellement — voir note ci-dessous)* |
-| Total heures | dérivé des 5 semaines, jamais stocké séparément | `ResultatPaie.total_heures` | `{{TOTAL_HEURES}}` |
-| Taux horaire | `Enseignant.taux_horaire` | `ResultatPaie.taux_horaire` | `{{TAUX_HORAIRE}}` |
-| Gain Heures / Hourly Wage | `total_heures × taux_horaire` (calculé **uniquement** dans `paie_service`) | `ResultatPaie.gain_heures` | `{{GAIN_HEURES}}` |
-| Prime AP/PP / Incentive HOD/CM | `ElementRemuneration` (`type_element='prime_ap_pp'`) | `ResultatPaie.prime_ap_pp` | `{{PRIME_AP_PP}}` |
-| Surveillance/Secretariat / Invigilation | `ElementRemuneration` (`type_element='surveillance_secretariat'`) | `ResultatPaie.surveillance_secretariat` | `{{SURVEILLANCE_SECRETARIAT}}` |
-| Indemnite Suggestion / Duty Post Allowance | `ElementRemuneration` (`type_element='indemnite_suggestion_admin'`) | `ResultatPaie.indemnite_suggestion_admin` | `{{INDEMNITE_SUGGESTION_ADMIN}}` |
-| Taxe / Tax | `base_taxable × TAUX_TAXE` (calculé **uniquement** dans `paie_service`) | `ResultatPaie.taxe_5` | `{{TAXE_5}}` |
-| Retenue Amicale / Social Deduction | `Retenue` (`type_retenue='retenue_amicale'`) | `ResultatPaie.retenue_amicale` | `{{RETENUE_AMICALE}}` |
-| Dette / Debt | `Retenue` (`type_retenue='dette'`) | `ResultatPaie.dette` | `{{DETTE}}` |
-| Total (ligne agrégée) | — | `base_taxable` / `base_taxable − net_a_percevoir` (soustraction entre deux résultats déjà finaux, pas une formule de paie) | `{{TOTAL_GAINS}}` / `{{TOTAL_RETENUES}}` |
-| NET A PAYER | `paie_service` (formule officielle unique) | `ResultatPaie.net_a_percevoir` | `{{NET_A_PERÇEVOIR}}` |
-| Montant en lettres | dérivé de `net_a_percevoir`, jamais d'un autre montant | `utils.montant_en_lettres.montant_en_lettres(resultat.net_a_percevoir)` | `{{NET_EN_LETTRES}}` |
-| Date (signature) | date de génération du bulletin (aucune date officielle dédiée sur `PeriodePaie`) | `datetime.now()` au moment de la génération | `{{DATE_GENERATION}}` |
+| Zone du bulletin officiel | Source | Balise |
+|---|---|---|
+| Nom et prénoms (bande jaune) | `Enseignant.nom`, `Enseignant.prenom` (majuscules) | `{{NOM_COMPLET}}` (ou `{{NOM}}` `{{PRENOM}}`) |
+| Statut: V / P | `Enseignant.statut` ; pour une période validée ou clôturée, statut de l'instantané du bulletin | `{{STATUT}}` (`{{STATUT_LIBELLE}}` : Vacataire / Permanent) |
+| Mois (bande verte, en anglais) | `PeriodePaie.mois`, `PeriodePaie.annee` -> « JULY 2026 » | `{{PERIODE}}` (`{{PERIODE_FR}}` : libellé français) |
+| Gain Heures : heures, taux, montant | `ResultatPaie.total_heures`, `taux_horaire`, `gain_heures` | `{{TOTAL_HEURES}}`, `{{TAUX_HORAIRE}}`, `{{GAIN_HEURES}}` |
+| Prime AP/PP | `ResultatPaie.prime_ap_pp` | `{{PRIME_AP_PP}}` |
+| Surveillance/Secretariat | `ResultatPaie.surveillance_secretariat` | `{{SURVEILLANCE_SECRETARIAT}}` |
+| Indemnite Suggestion | `ResultatPaie.indemnite_suggestion_admin` | `{{INDEMNITE_SUGGESTION_ADMIN}}` |
+| Taxe | `ResultatPaie.taxe_5` = base taxable × taux de la période | `{{TAXE}}` (`{{TAXE_TAUX}}` : « 5,5 % ») |
+| Retenue Amicale | `ResultatPaie.retenue_amicale` | `{{RETENUE_AMICALE}}` |
+| Dette | `ResultatPaie.dette` | `{{DETTE}}` |
+| Total gains / Total retenues | `base_taxable` / `base_taxable − net_a_percevoir` | `{{TOTAL_GAINS}}` / `{{TOTAL_RETENUES}}` |
+| NET A PAYER (chiffres, lettres anglaises) | `ResultatPaie.net_a_percevoir` | `{{NET_A_PAYER}}`, `{{NET_EN_LETTRES}}` |
+| Semaines 1 à 5 (absentes du bulletin officiel) | `ResultatPaie.semaine_1..5` | `{{SEMAINE_1}}` … `{{SEMAINE_5}}` |
+| Date (absente du bulletin officiel : date manuscrite) | date de génération | `{{DATE}}` |
 
-**Note semaines 1 à 5** : le modèle officiel ne comporte pas de ligne dédiée par
-semaine (une seule ligne "Gain Heures / Hourly Wage" avec heures, taux, gain).
-Conformément à la consigne explicite du module 07 ("ne pas déformer le modèle
-pour les ajouter"), les 5 semaines ne sont pas affichées individuellement,
-mais restent disponibles sur `ResultatPaie.semaine_1..5` pour un usage futur
-(export détaillé, audit).
+Noms historiques toujours acceptés : `{{TAXE_5}}`, `{{NET_A_PERÇEVOIR}}`,
+`{{DATE_GENERATION}}`, `{{BASE_TAXABLE}}`.
 
-## Champs fixes (texte institutionnel, non variables)
+Montants : entiers FCFA sans séparateur de milliers (« 18000 »), comme sur
+le bulletin officiel. Aucune formule de paie hors de `services/paie_service.py`.
 
-Reproduits tels quels dans `templates/build_template.py`, désormais lus
-depuis `config/settings.py` (`ETABLISSEMENT_ENTETE_FR/EN`,
-`LIEU_SIGNATURE`, `TITRE_SIGNATAIRE_FR/EN`) plutôt que codés en dur :
-République du Cameroun / Republic of Cameroon, devises bilingues, région,
-délégations régionale et départementale, nom de l'établissement,
-BULLETIN DE SOLDE / PAYSLIP, intitulés
-de rubriques bilingues, bloc signature.
+## Éléments fixes du modèle standard
 
-## Champs absents de la base (non inventés)
+En-tête bilingue (`config/settings.py` : `ETABLISSEMENT_ENTETE_FR/EN`), logo de
+l'établissement (`assets/logo_etablissement.png`, fichier local exclu de Git),
+intitulés des rubriques, « Done at Yaoundé on the / Fait à Yaoundé le: »
+(`LIEU_SIGNATURE`), titre du signataire (`TITRE_SIGNATAIRE_FR/EN`). Le nom du
+signataire n'est pas inventé ; la date et la signature restent manuscrites.
 
-| Champ | Source actuelle | Disponible | Solution retenue |
-|---|---|---|---|
-| Logo de l'établissement | Aucune | NON | Espace réservé dans l'en-tête (cellule centrale), laissé vide plutôt que d'inventer un graphique. Un chemin d'image pourra être ajouté en configuration si le fichier est fourni. |
-| Nom du signataire ("Coordonateur Général") | Aucune | NON | Seul le **titre de fonction** (déjà présent dans le modèle) est reproduit ; aucun nom n'est inventé. Zone de signature laissée vide pour signature manuscrite. |
-| Adresse / téléphone de l'établissement | Aucune | NON | Non présents dans le modèle officiel fourni ; non ajoutés (rien à reproduire ni à inventer). |
-| Date administrative dédiée à la période | `PeriodePaie` n'a que `mois`/`annee`/`libelle` | NON | Date de génération du bulletin utilisée à la place, comme explicitement autorisé par la consigne d'origine du module 07. |
+## Fichiers
+
+| Fichier | Rôle |
+|---|---|
+| `templates/build_template.py` | construit les deux modèles standard (dimensions relevées sur le PDF officiel) |
+| `templates/bulletin_template.docx` | modèle Word standard (balises historiques) |
+| `templates/bulletin_modele_standard.pdf` + `.json` | modèle PDF standard et ses zones |
+| `data/modeles_bulletin/` | modèles importés (table `modeles_bulletin`) |

@@ -58,19 +58,53 @@ Toute restauration est enregistrée dans le journal d'audit. Les comptes présen
 
 ## 6. Diagnostics
 
-Onglet **Diagnostic** : état global en toutes lettres, accessibilité et intégrité de la base, présence des tables, nombre d'enseignants, de périodes, de bulletins et d'entrées d'audit, taille des exports, sauvegardes disponibles, présence du modèle de bulletin, comptes et administrateurs actifs, registre des documents (documents manquants).
+Onglet **Diagnostic** : état global en toutes lettres, accessibilité et intégrité de la base, présence des tables, nombre d'enseignants, de périodes, de bulletins et d'entrées d'audit, taille des exports, sauvegardes disponibles, présence du modèle Word standard, nombre de bulletins Word et PDF, comptes et administrateurs actifs, registre des documents (documents manquants).
 
 Onglet **Maintenance** : **Lancer les vérifications** produit un tableau « Conforme / Échec » des contrôles essentiels, sans rien modifier.
 
 Onglet **Journaux** : dernières lignes du journal technique, avec recherche. Ce journal est distinct du journal d'audit.
 
-## 7. Réinitialisation des données
+## 7. Taux de taxe
+
+Onglet **Paramètres**, rubrique **Paramètres de paie**.
+
+- **Taux par défaut** : saisissez le taux en pourcentage (par exemple `5,5` pour 5 % d'impôt et 10 % de centimes additionnels), puis **Enregistrer le taux**. Tant qu'il n'a jamais été modifié, il vaut 5 %. Il est recopié sur chaque période créée ensuite ; il ne modifie aucune période existante.
+- **Appliquer aussi aux périodes en brouillon ou ouvertes** : case à cocher du même formulaire ; les périodes validées ou clôturées ne sont jamais touchées.
+- **Taux d'une période** : page **Gestion › Périodes de paie**, période sélectionnée, **Appliquer ce taux à la période** (brouillon ou ouverte uniquement).
+- **Figé à la validation** : une fois la période validée, son taux ne peut plus changer, ni depuis l'interface ni par une modification directe de la base (règle de protection SQL). Un bulletin validé ou clôturé est donc toujours recalculé à l'identique.
+
+Le taux est saisi entre 0 et 50 %, avec au plus deux décimales. Chaque modification (taux par défaut ou taux d'une période) est inscrite au journal d'audit avec l'ancien et le nouveau taux. Seul un administrateur peut modifier un taux ; la vérification est faite par le service, pas seulement par l'interface.
+
+## 8. Modèles de bulletin
+
+Onglet **Modèles de bulletin**.
+
+**Modèles standard** : « Bulletin officiel » en Word (.docx) et en PDF. Ils reproduisent le bulletin de solde officiel de l'établissement : en-tête bilingue avec le logo, bande verte « BULLETIN DE SOLDE / PAYSLIP » et mois en anglais, bande jaune nom / statut, rubriques 1 à 7 (gain heures avec heures, taux et montant ; prime AP/PP ; surveillance/secrétariat ; indemnité ; taxe ; retenue amicale ; dette), lignes Total et NET A PAYER (en chiffres et en lettres), « Fait à Yaoundé le : » et titre du signataire. Les montants sont écrits sans séparateur de milliers, comme sur l'original. Tant qu'aucun choix n'a été fait, le modèle actif est le modèle Word standard.
+
+L'en-tête réel (région, délégations, nom de l'établissement) et le logo ne sont pas livrés avec l'application : ils sont décrits dans `config/etablissement_local.py` (à créer à partir de `config/etablissement_local.example.py`, logo dans `assets/logo_etablissement.png`). La commande `python templates/build_template.py --etablissement --pdf` produit alors les modèles de l'établissement dans le dossier `modeles_etablissement` du dossier de données ; l'application les utilise à la place des modèles neutres (« NOM DE L'ETABLISSEMENT ») livrés dans `templates/`.
+
+**Activer un modèle** : choisissez-le puis **Activer ce modèle**. Les bulletins générés ensuite sont produits dans son format (Word ou PDF). Les fichiers déjà produits ne sont pas modifiés. **Produire un bulletin d'essai** crée un bulletin rempli de valeurs d'exemple, affiché en image pour un PDF et téléchargeable dans tous les cas.
+
+**Ajouter un modèle** (Word .docx ou PDF, 10 Mo maximum) :
+
+1. *Bulletin déjà rempli* — par exemple un bulletin d'un mois précédent exporté en PDF depuis Excel. L'application repère les textes du document et propose, pour chacun, le champ correspondant (nom, période, statut, heures, taux, montants, totaux, net en chiffres et en lettres) à partir des intitulés de la même ligne. Vérifiez la colonne **Champ**, corrigez si besoin (choisissez « texte fixe » pour un texte à conserver tel quel) et, pour un PDF, l'alignement de chaque valeur. Le nom et le net à payer sont obligatoires.
+2. *Modèle à balises* — un document où chaque valeur variable est remplacée par une balise, par exemple `{{NOM_COMPLET}}`, `{{PERIODE}}`, `{{NET_A_PAYER}}`. La liste complète est affichée dans l'onglet. Dans un PDF, `{{NET_A_PAYER|centre}}` ou `|droite` règle l'alignement ; une balise doit tenir sur une seule ligne. Le modèle Word standard, téléchargeable depuis l'onglet, sert de point de départ.
+
+Avant tout enregistrement, **Produire un bulletin d'essai** montre le résultat ; **Enregistrer le modèle** refait l'essai et n'enregistre rien s'il échoue. Un PDF numérisé (image sans texte) est refusé : exportez le bulletin en PDF depuis Excel ou Word.
+
+Dans un modèle PDF, les textes remplacés sont réellement effacés puis réécrits dans la même police (famille, taille, graisse, couleur), sur la même ligne ; le fond, les traits, le logo et les textes fixes restent inchangés. Les polices utilisées pour les valeurs sont les polices standard du PDF (Times ou Helvetica).
+
+Le modèle enregistré ne conserve pas les valeurs du bulletin envoyé : dans un PDF, elles sont effacées ; dans un document Word, elles sont remplacées par des balises. Seuls les textes laissés en « texte fixe » restent tels quels.
+
+Les modèles importés sont conservés dans le dossier `modeles_bulletin` du dossier de données ; chaque sauvegarde de la base en emporte une copie, remise en place à la restauration. Un modèle actif ne peut pas être supprimé ; les modèles standard ne peuvent pas l'être. Si le fichier du modèle actif disparaît, les bulletins sont produits avec le modèle Word standard. Import, activation et suppression sont inscrits au journal d'audit.
+
+## 9. Réinitialisation des données
 
 Onglet **Réinitialisation des données**. Cette opération est distincte de la gestion des comptes : **elle ne supprime, ne modifie et ne réinitialise aucun compte utilisateur**.
 
-**Supprimé** : enseignants, périodes, heures, primes et indemnités, retenues, bulletins, registre des documents, fichiers générés (dossier des exports : bulletins, états Excel, archives, packs), journaux d'importation et leurs erreurs, alertes, et entrées du journal d'audit relatives à ces données.
+**Supprimé** : enseignants, périodes, heures, primes et indemnités, retenues, bulletins, registre des documents, fichiers générés (dossier des exports : bulletins, états Excel, archives, packs), journaux d'importation et leurs erreurs, alertes.
 
-**Conservé à l'identique** : table des comptes (noms d'utilisateur, empreintes de mots de passe, rôles, statuts, dates), permissions, sessions ouvertes, entrées d'audit de sécurité (connexions, gestion des comptes, restaurations, réinitialisations), paramètres de l'établissement, sauvegardes, journaux techniques, modèle de bulletin, schéma de la base et ses règles de protection.
+**Conservé à l'identique** : table des comptes (noms d'utilisateur, empreintes de mots de passe, rôles, statuts, dates), permissions, sessions ouvertes, journal d'audit complet (connexions, gestion des comptes, restaurations, réinitialisations, mais aussi calculs, validations et exports : l'historique de ce qui a été fait n'est jamais effacé), paramètres de l'établissement, sauvegardes, journaux techniques, taux de taxe par défaut, modèles de bulletin et modèle actif, schéma de la base et ses règles de protection.
 
 Déroulement :
 
@@ -85,7 +119,7 @@ Déroulement :
 
 Pour revenir à l'état antérieur, restaurez `avant_reinitialisation_<date>.db` depuis l'onglet Restauration. Les fichiers générés se trouvent dans l'archive `Avant_Reinitialisation_<date>.zip`, dossier `documents/`.
 
-## 8. Maintenance
+## 10. Maintenance
 
 - Consultez régulièrement **Notifications** : les alertes signalent notamment une sauvegarde absente ou ancienne et des documents manquants ou modifiés.
 - Consultez **Diagnostic** en cas de doute ; un état « problème détecté » doit être traité avant toute nouvelle opération de paie.

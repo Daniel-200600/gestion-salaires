@@ -90,7 +90,7 @@ def _feuille_synthese(classeur: Workbook, rapport: EtatPaieComplet) -> None:
         ("Total base taxable", etat.totaux.total_gain_heures + etat.totaux.total_primes),
         ("", ""),
         ("RETENUES", ""),
-        ("Total taxe (5 %)", etat.totaux.total_taxe),
+        ("Total taxe", etat.totaux.total_taxe),
         ("Total retenue amicale", etat.totaux.total_retenue_amicale),
         ("Total dettes", etat.totaux.total_dette),
         ("", ""),

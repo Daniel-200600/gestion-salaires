@@ -51,6 +51,7 @@ Toutes les données sont enregistrées **sur le poste qui exécute le logiciel**
 - les sauvegardes (dossier `backups`) ;
 - les journaux techniques (dossier `logs`) ;
 - les paramètres de l'établissement (fichier `parametres_etablissement.json`).
+- les modèles de bulletin importés par un administrateur (dossier `modeles_bulletin`). Lorsqu'un bulletin déjà rempli est envoyé comme modèle, les valeurs reconnues (nom, statut, montants...) sont effacées ou remplacées par des balises avant l'enregistrement ; un texte que l'administrateur laisse en « texte fixe » est en revanche conservé tel quel.
 
 Sous Windows, ce dossier est `data\` à côté de l'exécutable s'il existe, sinon `%APPDATA%\GestionPaie\`. L'emplacement exact est affiché dans Administration › Paramètres › Emplacements de stockage.
 
@@ -105,4 +106,4 @@ Fonctions du logiciel utiles pour répondre à une demande :
 
 ## 10. Évolution de ce document
 
-Ce document doit être mis à jour lorsque le fonctionnement du logiciel ou l'organisation de l'établissement change. Version du logiciel décrite : 1.0.0. [Date de validation par l'établissement, à compléter.]
+Ce document doit être mis à jour lorsque le fonctionnement du logiciel ou l'organisation de l'établissement change. Version du logiciel décrite : 1.1.0. [Date de validation par l'établissement, à compléter.]

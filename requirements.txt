@@ -4,6 +4,8 @@ streamlit>=1.38
 openpyxl>=3.1
 python-docx>=1.1
 pandas>=2.2
+# Bulletins PDF : lecture et remplissage des modèles PDF
+pymupdf>=1.24
 
 # --- Dépendances futures (à décommenter au fur et à mesure des modules) ---
 # plotly>=5.24

@@ -7,7 +7,7 @@ exclusivement les validations déjà définies dans utils/validators.py
 (les mêmes que celles utilisées individuellement par
 services/heures_service.py, services/remuneration_service.py et
 services/retenue_service.py) et ne calcule ni ne duplique aucune
-formule de salaire (gain heures, base taxable, taxe 5 %, net à
+formule de salaire (gain heures, base taxable, taxe, net à
 percevoir restent hors périmètre du module 04).
 
 PRINCIPE TRANSACTIONNEL

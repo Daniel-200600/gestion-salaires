@@ -13,7 +13,7 @@ Deux façons distinctes de retirer un enseignant :
   existe pour cet enseignant (traçabilité des salaires protégée).
 """
 
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from pathlib import Path
 from typing import List, Optional, Union
 import sqlite3
@@ -54,6 +54,7 @@ __all__ = [
     "lister_enseignants",
     "rechercher_enseignants",
     "modifier_enseignant",
+    "changer_statut_enseignant",
     "desactiver_enseignant",
     "reactiver_enseignant",
     "obtenir_dependances_enseignant",
@@ -152,8 +153,13 @@ def modifier_enseignant(
     telephone: Optional[str] = None,
     adresse: Optional[str] = None,
     db_path: DbPath = None,
+    utilisateur: Optional[str] = None,
 ) -> Enseignant:
-    """Valide puis applique une modification à un enseignant existant. Ne touche pas à `actif`."""
+    """
+    Valide puis applique une modification à un enseignant existant. Ne
+    touche pas à `actif`. Un changement de statut est journalisé (voir
+    `changer_statut_enseignant`).
+    """
     existant = obtenir_enseignant(enseignant_id, db_path=db_path)  # lève si inexistant
     enseignant_modifie = _construire_enseignant_valide(
         nom, prenom, sexe, statut, taux_horaire, email, telephone, adresse,
@@ -161,6 +167,45 @@ def modifier_enseignant(
         actif=existant.actif,
     )
     enseignant_repository.mettre_a_jour(enseignant_modifie, db_path=db_path)
+    if enseignant_modifie.statut != existant.statut:
+        _journaliser_changement_statut(existant, enseignant_modifie.statut, utilisateur, db_path)
+    return enseignant_repository.obtenir_par_id(enseignant_id, db_path=db_path)
+
+
+_LIBELLES_STATUT = {"V": "Vacataire", "P": "Permanent"}
+
+
+def _journaliser_changement_statut(enseignant: Enseignant, nouveau_statut, utilisateur: Optional[str],
+                                   db_path: DbPath) -> None:
+    audit_log_repository.enregistrer(
+        AuditLog(
+            type_action=TypeActionAudit.STATUT_ENSEIGNANT_MODIFIE, entite="enseignant", entite_id=enseignant.id,
+            utilisateur=utilisateur,
+            details=(f"{enseignant.nom} {enseignant.prenom} : {_LIBELLES_STATUT[enseignant.statut.value]} -> "
+                     f"{_LIBELLES_STATUT[nouveau_statut.value]}"),
+        ),
+        db_path=db_path,
+    )
+
+
+def changer_statut_enseignant(
+    enseignant_id: int, nouveau_statut, utilisateur: Optional[str] = None, db_path: DbPath = None
+) -> Enseignant:
+    """
+    Change le statut d'un enseignant (Vacataire <-> Permanent). Le
+    nouveau statut s'applique aux calculs et bulletins produits à partir
+    de maintenant. Les bulletins déjà émis pour une période validée ou
+    clôturée gardent le statut enregistré dans leur instantané
+    (services/bulletin_service.py). Le changement est journalisé.
+    """
+    existant = obtenir_enseignant(enseignant_id, db_path=db_path)  # lève si inexistant
+    statut = valider_statut(nouveau_statut)
+    if statut == existant.statut:
+        raise EnseignantValidationError(
+            f"L'enseignant est déjà {_LIBELLES_STATUT[statut.value].lower()} : aucun changement."
+        )
+    enseignant_repository.mettre_a_jour(replace(existant, statut=statut), db_path=db_path)
+    _journaliser_changement_statut(existant, statut, utilisateur, db_path)
     return enseignant_repository.obtenir_par_id(enseignant_id, db_path=db_path)
 
 

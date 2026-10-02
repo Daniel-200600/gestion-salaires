@@ -174,7 +174,13 @@ def creer_periode(mois, annee, db_path: DbPath = None) -> PeriodePaie:
         )
 
     libelle = generer_libelle(mois_valide, annee_valide)
-    periode = PeriodePaie(mois=mois_valide, annee=annee_valide, libelle=libelle)
+    # Le taux de taxe en vigueur à la création est recopié sur la période
+    # (modifiable ensuite jusqu'à la validation, cf. parametres_paie_service).
+    from services.parametres_paie_service import obtenir_taux_taxe_defaut  # import local : évite un cycle
+    periode = PeriodePaie(
+        mois=mois_valide, annee=annee_valide, libelle=libelle,
+        taux_taxe=obtenir_taux_taxe_defaut(db_path=db_path),
+    )
 
     try:
         nouvel_id = periode_repository.creer(periode, db_path=db_path)

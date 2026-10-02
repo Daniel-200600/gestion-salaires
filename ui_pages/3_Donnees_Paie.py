@@ -5,7 +5,7 @@ Règle d'architecture stricte : cette page ne contient AUCUNE requête
 SQL et AUCUNE formule de salaire. Elle appelle exclusivement
 services/heures_service.py, services/remuneration_service.py et
 services/retenue_service.py. Le calcul du net à percevoir (gain
-heures, base taxable, taxe 5 %, net) sera implémenté au module 05.
+heures, base taxable, taxe, net) sera implémenté au module 05.
 """
 
 import sys

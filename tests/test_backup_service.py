@@ -360,3 +360,68 @@ def test_creer_sauvegarde_simple_reste_db_uniquement(base_avec_donnees, dossier_
     """La fonction historique creer_sauvegarde() n'inclut jamais les documents — comportement inchangé."""
     chemin = backup_service.creer_sauvegarde(db_path=base_avec_donnees, backup_dir=dossier_sauvegardes)
     assert chemin.suffix == ".db"  # toujours un simple fichier .db, jamais un ZIP
+
+
+# ---------------------------------------------------------------------
+# Modèles de bulletin importés (fichiers de data/modeles_bulletin/)
+# ---------------------------------------------------------------------
+
+def _creer_modele_importe(db_path, nom="modele_abc.docx", contenu=b"PK modele"):
+    dossier = backup_service.dossier_modeles_de_la_base(db_path)
+    dossier.mkdir(parents=True, exist_ok=True)
+    (dossier / nom).write_bytes(contenu)
+    return dossier / nom
+
+
+def test_sauvegarde_emporte_les_modeles_importes(base_avec_donnees, dossier_sauvegardes):
+    _creer_modele_importe(base_avec_donnees)
+    sauvegarde = backup_service.creer_sauvegarde(db_path=base_avec_donnees, backup_dir=dossier_sauvegardes)
+    compagnon = backup_service.dossier_modeles_de_la_sauvegarde(sauvegarde)
+    assert (compagnon / "modele_abc.docx").read_bytes() == b"PK modele"
+
+
+def test_sauvegarde_sans_modele_ne_cree_pas_de_dossier_compagnon(base_avec_donnees, dossier_sauvegardes):
+    sauvegarde = backup_service.creer_sauvegarde(db_path=base_avec_donnees, backup_dir=dossier_sauvegardes)
+    assert not backup_service.dossier_modeles_de_la_sauvegarde(sauvegarde).exists()
+
+
+def test_dossier_compagnon_absent_de_la_liste_des_sauvegardes(base_avec_donnees, dossier_sauvegardes):
+    _creer_modele_importe(base_avec_donnees)
+    backup_service.creer_sauvegarde(db_path=base_avec_donnees, backup_dir=dossier_sauvegardes)
+    assert [s.nom.endswith(".db") for s in backup_service.lister_sauvegardes(dossier_sauvegardes)] == [True]
+
+
+def test_restauration_remet_en_place_les_modeles_perdus(base_avec_donnees, dossier_sauvegardes):
+    modele = _creer_modele_importe(base_avec_donnees)
+    sauvegarde = backup_service.creer_sauvegarde(db_path=base_avec_donnees, backup_dir=dossier_sauvegardes)
+    modele.unlink()  # ex. changement de PC : la base revient, pas le dossier des modèles
+
+    rapport = backup_service.restaurer_sauvegarde(
+        sauvegarde, confirmation=True, db_path=base_avec_donnees, backup_dir=dossier_sauvegardes
+    )
+
+    assert rapport.reussie
+    assert modele.read_bytes() == b"PK modele"
+    assert "1 modèle(s) de bulletin remis en place" in rapport.message
+
+
+def test_restauration_n_ecrase_jamais_un_modele_present(base_avec_donnees, dossier_sauvegardes):
+    modele = _creer_modele_importe(base_avec_donnees, contenu=b"PK version sauvegardee")
+    sauvegarde = backup_service.creer_sauvegarde(db_path=base_avec_donnees, backup_dir=dossier_sauvegardes)
+    modele.write_bytes(b"PK version actuelle")
+
+    rapport = backup_service.restaurer_sauvegarde(
+        sauvegarde, confirmation=True, db_path=base_avec_donnees, backup_dir=dossier_sauvegardes
+    )
+
+    assert rapport.reussie
+    assert modele.read_bytes() == b"PK version actuelle"
+
+
+def test_sauvegarde_complete_contient_les_modeles(base_avec_donnees, dossier_sauvegardes):
+    import zipfile
+
+    _creer_modele_importe(base_avec_donnees, nom="modele_abc.pdf", contenu=b"%PDF modele")
+    chemin_zip = backup_service.creer_sauvegarde_complete(db_path=base_avec_donnees, backup_dir=dossier_sauvegardes)
+    with zipfile.ZipFile(chemin_zip) as archive:
+        assert archive.read("modeles_bulletin/modele_abc.pdf") == b"%PDF modele"

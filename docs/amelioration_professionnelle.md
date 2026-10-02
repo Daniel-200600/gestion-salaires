@@ -11,7 +11,7 @@ Périmètre établi à partir du schéma réel (`database/schema.sql`) :
 | Supprimé | Conservé |
 |---|---|
 | `alertes`, `import_erreurs`, `imports`, `documents`, `bulletins_paie`, `saisies_heures`, `elements_remuneration`, `retenues`, `periodes_paie`, `enseignants` | `utilisateurs` (strictement identique, vérifié par empreinte) |
-| entrées d'`audit_log` décrivant ces objets (historique métier) | entrées d'`audit_log` de sécurité : connexions, gestion des comptes, restaurations, réinitialisations |
+| — | `audit_log` en entier (sécurité et historique métier) : connexions, gestion des comptes, restaurations, réinitialisations |
 | contenu du dossier des exports (bulletins, états Excel, archives, packs) | paramètres de l'établissement, sauvegardes, journaux techniques, modèle de bulletin |
 
 Aucune table de paramètres n'existe en base : la configuration est dans `config/settings.py` et `parametres_etablissement.json`, non touchés. Les séquences d'identifiants (`sqlite_sequence`) sont conservées : un nouvel enseignant ou une nouvelle période ne reprend jamais l'identifiant d'un objet supprimé.
