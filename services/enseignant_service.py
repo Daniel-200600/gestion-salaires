@@ -57,6 +57,9 @@ __all__ = [
     "modifier_enseignant",
     "lister_enseignants_a_completer",
     "lister_enseignants_payables",
+    "ComplementFiche",
+    "ResultatComplementLot",
+    "completer_fiches_en_lot",
     "changer_statut_enseignant",
     "desactiver_enseignant",
     "reactiver_enseignant",
@@ -190,6 +193,8 @@ _LIBELLES_STATUT = {"V": "Vacataire", "P": "Permanent", None: "non renseigné"}
 
 
 def _vide(valeur) -> bool:
+    if isinstance(valeur, float) and valeur != valeur:  # NaN : cellule vide d'un tableau
+        return True
     return valeur is None or (isinstance(valeur, str) and not valeur.strip())
 
 
@@ -201,6 +206,72 @@ def lister_enseignants_a_completer(db_path: DbPath = None) -> List[Enseignant]:
 def lister_enseignants_payables(db_path: DbPath = None) -> List[Enseignant]:
     """Enseignants actifs à fiche complète : les seuls proposés pour la saisie et le calcul de la paie."""
     return [e for e in enseignant_repository.lister(db_path=db_path) if e.est_complet]
+
+
+@dataclass
+class ComplementFiche:
+    """Informations saisies pour une fiche à compléter ; None = encore inconnu."""
+
+    enseignant_id: int
+    sexe: object = None
+    statut: object = None
+    taux_horaire: object = None
+
+
+@dataclass
+class ResultatComplementLot:
+    nb_fiches_modifiees: int = 0
+    nb_fiches_completees: int = 0  # fiches devenues complètes : elles entrent dans la paie
+
+
+def completer_fiches_en_lot(
+    complements: List[ComplementFiche], utilisateur: Optional[str] = None, db_path: DbPath = None
+) -> ResultatComplementLot:
+    """
+    Complète plusieurs fiches en une fois (sexe, statut, taux horaire).
+
+    Tout est validé avant la moindre écriture : une seule valeur invalide
+    et rien n'est enregistré (le message nomme l'enseignant concerné).
+    Les écritures se font ensuite dans une seule transaction. Comme pour
+    `modifier_enseignant`, une valeur laissée vide n'efface jamais une
+    information déjà connue.
+    """
+    a_ecrire = []
+    for complement in complements:
+        existant = obtenir_enseignant(complement.enseignant_id, db_path=db_path)
+        try:
+            modifie = replace(
+                existant,
+                sexe=existant.sexe if _vide(complement.sexe) else valider_sexe(complement.sexe),
+                statut=existant.statut if _vide(complement.statut) else valider_statut(complement.statut),
+                taux_horaire=(existant.taux_horaire if _vide(complement.taux_horaire)
+                              else valider_taux_horaire(complement.taux_horaire)),
+            )
+        except EnseignantValidationError as erreur:
+            raise EnseignantValidationError(
+                f"{existant.nom} {existant.prenom}".strip() + f" : {erreur} Aucune fiche n'a été enregistrée."
+            ) from erreur
+        if (modifie.sexe, modifie.statut, modifie.taux_horaire) != (
+            existant.sexe, existant.statut, existant.taux_horaire
+        ):
+            a_ecrire.append((existant, modifie))
+
+    with get_connection(db_path) as conn:
+        try:
+            for _, modifie in a_ecrire:
+                enseignant_repository.mettre_a_jour(modifie, conn=conn)
+        except Exception:
+            conn.rollback()
+            raise
+        conn.commit()
+
+    for existant, modifie in a_ecrire:
+        if modifie.statut != existant.statut:
+            _journaliser_changement_statut(existant, modifie.statut, utilisateur, db_path)
+    return ResultatComplementLot(
+        nb_fiches_modifiees=len(a_ecrire),
+        nb_fiches_completees=sum(1 for _, modifie in a_ecrire if modifie.est_complet),
+    )
 
 
 def _journaliser_changement_statut(enseignant: Enseignant, nouveau_statut, utilisateur: Optional[str],

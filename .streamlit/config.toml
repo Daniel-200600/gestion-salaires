@@ -41,3 +41,6 @@ gatherUsageStats = false
 # L'application n'écoute que sur cet ordinateur : elle n'est pas joignable
 # depuis le réseau (Wi-Fi de l'établissement, etc.).
 address = "127.0.0.1"
+# Taille maximale d'un fichier envoyé (Mo) : aucun import de l'application
+# n'accepte plus de 10 Mo ; le logo est limité à 2 Mo par sa propre zone.
+maxUploadSize = 10

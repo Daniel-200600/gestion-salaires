@@ -14,13 +14,18 @@ from pathlib import Path
 # ou via un futur app.py multipage).
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
+from io import BytesIO
+
 import streamlit as st
 
 from database.initialization import init_database
+from exports.import_template_export import generer_classeur_fiches_a_completer
 from services.enseignant_service import (
     MESSAGE_BULLETIN_EXISTANT,
+    ComplementFiche,
     EnseignantValidationError,
     changer_statut_enseignant,
+    completer_fiches_en_lot,
     creer_enseignant,
     desactiver_enseignant,
     lister_enseignants,
@@ -109,8 +114,80 @@ if fiches_a_completer:
     st.warning(
         f"{len(fiches_a_completer)} fiche(s) à compléter (sexe, statut ou taux horaire manquant, souvent après "
         "l'import d'une liste existante). Ces enseignants n'entrent pas dans la paie tant que leur fiche est "
-        "incomplète : sélectionnez-les ci-dessous, onglet « Modifier »."
+        "incomplète : complétez-les toutes ensemble ci-dessous, ou une par une (onglet « Modifier »)."
     )
+    if (message_lot := st.session_state.pop("message_complement_lot", None)) is not None:
+        st.success(message_lot)
+    with st.expander(f"Compléter les fiches en une fois ({len(fiches_a_completer)})", expanded=False):
+        peut_completer = permission_service.a_permission(
+            utilisateur_courant_role(), permission_service.ENSEIGNANT_MODIFIER
+        )
+        st.caption(
+            "Choisissez le sexe et le statut, saisissez le taux horaire, puis enregistrez. Une case encore "
+            "inconnue peut rester vide : la fiche restera à compléter. Aucune information déjà enregistrée "
+            "n'est effacée."
+        )
+        # Clé renouvelée après chaque enregistrement : le tableau change de lignes.
+        version_editeur = st.session_state.get("version_editeur_fiches", 0)
+        tableau_modifie = st.data_editor(
+            [
+                {
+                    "ID": e.id, "Nom": e.nom, "Prénom": e.prenom,
+                    "Sexe": libelle_sexe(e.sexe) if e.sexe is not None else None,
+                    "Statut": libelle_statut(e.statut) if e.statut is not None else None,
+                    "Taux horaire (FCFA)": e.taux_horaire,
+                }
+                for e in fiches_a_completer
+            ],
+            column_config={
+                "ID": st.column_config.NumberColumn(disabled=True, width="small"),
+                "Nom": st.column_config.TextColumn(disabled=True),
+                "Prénom": st.column_config.TextColumn(disabled=True),
+                "Sexe": st.column_config.SelectboxColumn(options=OPTIONS_SEXE),
+                "Statut": st.column_config.SelectboxColumn(options=OPTIONS_STATUT),
+                "Taux horaire (FCFA)": st.column_config.NumberColumn(min_value=0, step=100, format="%d"),
+            },
+            hide_index=True, use_container_width=True, disabled=not peut_completer, placeholder="À renseigner",
+            key=f"editeur_fiches_{version_editeur}",
+        )
+        col_enregistrer, col_exporter = st.columns(2)
+        with col_enregistrer:
+            if st.button("Enregistrer les compléments", type="primary", disabled=not peut_completer):
+                try:
+                    resultat = completer_fiches_en_lot(
+                        [
+                            ComplementFiche(
+                                enseignant_id=int(ligne["ID"]),
+                                sexe=sexe_depuis_libelle(ligne["Sexe"]) if ligne["Sexe"] else None,
+                                statut=statut_depuis_libelle(ligne["Statut"]) if ligne["Statut"] else None,
+                                taux_horaire=ligne["Taux horaire (FCFA)"],
+                            )
+                            for ligne in tableau_modifie
+                        ],
+                        utilisateur=st.session_state.get("username"),
+                    )
+                except EnseignantValidationError as erreur:
+                    st.error(str(erreur))
+                else:
+                    st.session_state["message_complement_lot"] = (
+                        f"{resultat.nb_fiches_modifiees} fiche(s) mise(s) à jour, dont "
+                        f"{resultat.nb_fiches_completees} désormais complète(s) et incluse(s) dans la paie."
+                        if resultat.nb_fiches_modifiees else "Aucune information nouvelle à enregistrer."
+                    )
+                    st.session_state["version_editeur_fiches"] = version_editeur + 1
+                    st.rerun()
+        with col_exporter:
+            tampon_fiches = BytesIO()
+            generer_classeur_fiches_a_completer(fiches_a_completer).save(tampon_fiches)
+            st.download_button(
+                "Télécharger la liste à compléter (Excel)", data=tampon_fiches.getvalue(),
+                file_name="Fiches_enseignants_a_completer.xlsx",
+                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                help="À faire remplir (cases jaunes), puis à réimporter dans Importation, type « Enseignants », "
+                     "stratégie « Mettre à jour les doublons ».",
+            )
+elif (message_lot := st.session_state.pop("message_complement_lot", None)) is not None:
+    st.success(message_lot)
 
 col_recherche, col_filtre, col_incomplets = st.columns([3, 1, 1])
 with col_recherche:

@@ -22,6 +22,7 @@ indépendamment.
 import logging
 import re
 import unicodedata
+from difflib import SequenceMatcher
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple, Union
@@ -451,6 +452,7 @@ class LigneImport:
     anomalies: List[AnomalieImport] = field(default_factory=list)
     action: str = ActionLigne.REJETEE
     cible_id: Optional[int] = None  # id de l'enregistrement existant en cas de mise à jour
+    doublon_probable: Optional[str] = None  # enseignant au nom très proche (base ou fichier)
 
     @property
     def a_une_erreur(self) -> bool:
@@ -525,6 +527,10 @@ class RapportPreparation:
         )
 
     @property
+    def nb_doublons_probables(self) -> int:
+        return sum(1 for l in self.lignes if l.doublon_probable)
+
+    @property
     def toutes_anomalies(self) -> List[AnomalieImport]:
         return [a for l in self.lignes for a in l.anomalies]
 
@@ -533,16 +539,42 @@ class RapportPreparation:
 # Préparation — Import ENSEIGNANTS
 # ---------------------------------------------------------------------
 
+SEUIL_SIMILARITE_NOMS = 0.88
+
+
+def _cle_identite(nom: str, prenom: str) -> tuple:
+    """
+    Identité d'un enseignant pour la détection des doublons : les mots du
+    nom et du prénom, sans accents ni casse, dans n'importe quel ordre
+    (« MBARGA Élise » = « Elise Mbarga » = nom complet « Mbarga Elise »).
+    """
+    return tuple(sorted(_cle_normalisation(f"{nom} {prenom}").split()))
+
+
+def _sont_probablement_la_meme_personne(cle_a: tuple, cle_b: tuple) -> bool:
+    """Un prénom en plus ou en moins (« NGONO Marie » / « NGONO Marie Claire ») ou une faute de frappe."""
+    petite, grande = sorted((set(cle_a), set(cle_b)), key=len)
+    if len(petite) >= 2 and petite < grande:
+        return True
+    return SequenceMatcher(None, " ".join(cle_a), " ".join(cle_b)).ratio() >= SEUIL_SIMILARITE_NOMS
+
 def preparer_import_enseignants(
     analyse: RapportAnalyse,
     df: pd.DataFrame,
     strategie_doublon: StrategieDoublon = StrategieDoublon.REFUSER,
     db_path: DbPath = None,
+    ignorer_doublons_probables: bool = False,
 ) -> RapportPreparation:
     """
     Valide chaque ligne et détecte les doublons (internes au fichier et
     contre la base) — SANS jamais écrire en base (section 13/14). Une seule
     requête pour tous les enseignants existants (section 26).
+
+    Un même nom écrit dans un autre ordre est reconnu comme le même
+    enseignant. Un nom très proche sans être identique (prénom en plus ou
+    en moins, faute de frappe) est signalé comme doublon probable : la
+    ligne est créée avec un avertissement, ou écartée si
+    `ignorer_doublons_probables` est vrai.
 
     Seul le nom est obligatoire. Un sexe, un statut ou un taux horaire
     absent ou illisible n'écarte pas la ligne : l'enseignant est créé avec
@@ -552,9 +584,12 @@ def preparer_import_enseignants(
     reprises : une valeur déjà connue n'est jamais effacée.
     """
     enseignants_existants = enseignant_repository.lister(inclure_inactifs=True, db_path=db_path)
-    index_existants = {
-        (_cle_normalisation(e.nom), _cle_normalisation(e.prenom)): e for e in enseignants_existants
-    }
+    index_existants = {_cle_identite(e.nom, e.prenom): e for e in enseignants_existants}
+    # Noms déjà connus, pour la recherche des doublons probables : base puis lignes du fichier.
+    noms_connus: List[tuple] = [
+        (cle, f"« {e.nom} {e.prenom}".strip() + f" » (id {e.id}, déjà enregistré)")
+        for cle, e in index_existants.items()
+    ]
     colonnes = analyse.colonnes_reconnues
 
     rapport = RapportPreparation()
@@ -589,7 +624,7 @@ def preparer_import_enseignants(
         for champ in ("email", "telephone", "adresse"):
             donnees[champ] = nettoyer_champ_optionnel(valeur(champ))
 
-        cle = (_cle_normalisation(nom), _cle_normalisation(prenom))
+        cle = _cle_identite(nom, prenom)
         nom_affiche = f"{nom} {prenom}".strip()
         if cle in cles_vues_dans_fichier:
             _ajouter_avertissement(
@@ -602,6 +637,23 @@ def preparer_import_enseignants(
         cles_vues_dans_fichier[cle] = position
 
         existant = index_existants.get(cle)
+        if existant is None:
+            proche = next((libelle for cle_connue, libelle in noms_connus
+                           if _sont_probablement_la_meme_personne(cle, cle_connue)), None)
+            noms_connus.append((cle, f"« {nom_affiche} » (ligne {position} du fichier)"))
+            if proche is not None:
+                ligne.doublon_probable = proche
+                if ignorer_doublons_probables:
+                    _ajouter_avertissement(
+                        ligne, "nom", nom_affiche, f"Doublon probable de {proche} — ligne écartée."
+                    )
+                    ligne.action = ActionLigne.IGNOREE
+                    rapport.lignes.append(ligne)
+                    continue
+                _ajouter_avertissement(
+                    ligne, "nom", nom_affiche,
+                    f"Doublon probable de {proche} : vérifiez qu'il ne s'agit pas du même enseignant.",
+                )
         if existant is not None:
             if strategie_doublon == StrategieDoublon.REFUSER:
                 _ajouter_erreur(
@@ -626,6 +678,8 @@ def preparer_import_enseignants(
             for champ in ("sexe", "statut", "taux_horaire", "email", "telephone", "adresse"):
                 if donnees[champ] is None:
                     donnees[champ] = getattr(existant, champ)
+            # Même personne, nom écrit autrement (ordre, accents) : la fiche garde son nom.
+            donnees["nom"], donnees["prenom"] = existant.nom, existant.prenom
             ligne.action = ActionLigne.MISE_A_JOUR
             ligne.cible_id = existant.id
         else:

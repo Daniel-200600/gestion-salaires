@@ -101,3 +101,55 @@ def generer_modele_csv(type_import: TypeImport) -> str:
     for exemple in modele["exemples"]:
         lignes.append(",".join(str(v) for v in exemple))
     return "\n".join(lignes)
+
+
+REMPLISSAGE_A_COMPLETER = PatternFill("solid", fgColor="FFF2CC")
+
+
+def generer_classeur_fiches_a_completer(enseignants) -> Workbook:
+    """
+    Liste des fiches à compléter, au format du modèle d'import Enseignants :
+    les informations connues sont pré-remplies, les cases manquantes sont
+    surlignées. Une fois remplie, elle se réimporte telle quelle
+    (stratégie « Mettre à jour les doublons ») : seules les cases
+    renseignées sont reprises, rien n'est effacé.
+    """
+    modele = MODELES[TypeImport.ENSEIGNANTS]
+    classeur = Workbook()
+    feuille = classeur.active
+    feuille.title = "Donnees"
+    for index, nom_colonne in enumerate(modele["colonnes"], start=1):
+        cellule = feuille.cell(row=1, column=index, value=nom_colonne)
+        cellule.font = POLICE_ENTETE
+        cellule.fill = REMPLISSAGE_ENTETE
+        feuille.column_dimensions[get_column_letter(index)].width = 20
+    feuille.freeze_panes = "A2"
+
+    for ligne_index, enseignant in enumerate(enseignants, start=2):
+        valeurs = [
+            enseignant.nom, enseignant.prenom,
+            enseignant.sexe.value if enseignant.sexe is not None else None,
+            enseignant.statut.value if enseignant.statut is not None else None,
+            enseignant.taux_horaire,
+            enseignant.telephone, enseignant.email, enseignant.adresse,
+        ]
+        for colonne_index, valeur in enumerate(valeurs, start=1):
+            cellule = feuille.cell(row=ligne_index, column=colonne_index, value=valeur)
+            if colonne_index in (3, 4, 5) and valeur is None:
+                cellule.fill = REMPLISSAGE_A_COMPLETER
+
+    feuille_instructions = classeur.create_sheet("Instructions")
+    feuille_instructions.cell(row=1, column=1, value="Fiches d'enseignants à compléter").font = Font(bold=True, size=12)
+    instructions = [
+        "Remplissez les cases surlignées en jaune (Sexe, Statut, Taux_Horaire). Une case encore inconnue peut "
+        "rester vide : la fiche restera « à compléter ».",
+        "Ne modifiez pas les colonnes Nom et Prenom : elles servent à retrouver chaque enseignant.",
+        "Sexe : M ou F. Statut : P (Permanent) ou V (Vacataire). Taux_Horaire : nombre entier en FCFA.",
+        "Réimportez ensuite ce fichier dans Documents & Opérations › Importation, type « Enseignants », en "
+        "choisissant la stratégie « Mettre à jour les doublons ». Seules les cases renseignées sont reprises : "
+        "aucune information déjà enregistrée n'est effacée.",
+    ]
+    for i, ligne_instruction in enumerate(instructions, start=3):
+        feuille_instructions.cell(row=i, column=1, value=f"• {ligne_instruction}")
+    feuille_instructions.column_dimensions["A"].width = 110
+    return classeur

@@ -155,7 +155,9 @@ with onglet_parametres:
             titre_fr = st.text_input("Titre du signataire (français)", value=identite_actuelle.titre_signataire_fr)
         with col_titre_en:
             titre_en = st.text_input("Titre du signataire (anglais)", value=identite_actuelle.titre_signataire_en)
-        fichier_logo = st.file_uploader("Logo de l'établissement (PNG ou JPEG, 2 Mo au plus)", type=["png", "jpg", "jpeg"])
+        fichier_logo = st.file_uploader(
+            "Logo de l'établissement (PNG ou JPEG, 2 Mo au plus)", type=["png", "jpg", "jpeg"], max_upload_size=2
+        )
         retirer_logo = (
             st.checkbox("Retirer le logo actuel") if identite_actuelle.logo and identite_configuree else False
         )
@@ -365,7 +367,10 @@ with onglet_modeles:
         file_name="Modele_bulletin_standard.docx", mime=MIME_PAR_FORMAT["docx"],
     )
 
-    fichier_modele = st.file_uploader("Fichier du modèle (.docx ou .pdf, 10 Mo maximum)", type=["docx", "pdf"])
+    fichier_modele = st.file_uploader(
+        "Fichier du modèle (.docx ou .pdf, 10 Mo maximum)", type=["docx", "pdf"],
+        max_upload_size=modele_bulletin_service.TAILLE_MAX_OCTETS // (1024 * 1024),
+    )
     if fichier_modele is not None:
         contenu_modele = fichier_modele.getvalue()
         empreinte_modele = hashlib.sha256(contenu_modele).hexdigest()

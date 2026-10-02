@@ -21,7 +21,7 @@ NOM_APPLICATION = "Gestion des Salaires"
 # Auteur et contact affichés sur la page « À propos ».
 AUTEUR = "Daniel Tchomtchi"
 CONTACT_AUTEUR = "tchomtchidaniel@gmail.com"
-VERSION = "1.3.0"
+VERSION = "1.4.0"
 
 # Racine des ressources de l'application (lecture seule une fois installée :
 # templates, schéma SQL). Consciente de PyInstaller (module 20) — voir

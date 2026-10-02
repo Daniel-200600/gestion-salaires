@@ -102,7 +102,9 @@ if type_import == TypeImport.ENSEIGNANTS:
         "plus tard dans Gestion › Enseignants. Une fiche incomplète n'entre pas dans la paie."
     )
 fichier_televerse = st.file_uploader(
-    "Fichier Excel (.xlsx), CSV (.csv), Word (.docx) ou PDF (.pdf)", type=["xlsx", "csv", "docx", "pdf"]
+    "Fichier Excel (.xlsx), CSV (.csv), Word (.docx) ou PDF (.pdf), 10 Mo au maximum",
+    type=["xlsx", "csv", "docx", "pdf"],
+    max_upload_size=import_service.TAILLE_MAX_OCTETS // (1024 * 1024),
 )
 
 cle_etat = f"import_pipeline_{type_import.value}"
@@ -199,14 +201,29 @@ st.dataframe(analyse.apercu, use_container_width=True, hide_index=True)
 st.caption(f"Aperçu limité aux 10 premières lignes sur {analyse.nombre_lignes}.")
 
 strategie = StrategieDoublon.REFUSER
+ignorer_doublons_probables = False
 if type_import == TypeImport.ENSEIGNANTS:
     libelles_strategie = {
         "Refuser les doublons": StrategieDoublon.REFUSER,
         "Ignorer les doublons": StrategieDoublon.IGNORER,
         "Mettre à jour les doublons": StrategieDoublon.METTRE_A_JOUR,
     }
-    choix_strategie = st.selectbox("Stratégie face aux doublons", list(libelles_strategie.keys()))
+    choix_strategie = st.selectbox(
+        "Stratégie face aux doublons", list(libelles_strategie.keys()),
+        help="Un enseignant déjà enregistré, même écrit dans un autre ordre ou sans accents. Pour réimporter "
+             "la liste des fiches à compléter, choisissez « Mettre à jour les doublons ».",
+    )
     strategie = libelles_strategie[choix_strategie]
+    ignorer_doublons_probables = st.checkbox(
+        "Écarter les doublons probables",
+        help="Nom très proche d'un enseignant existant ou d'une autre ligne (prénom en plus ou en moins, "
+             "faute de frappe). Sans cette case, la ligne est créée avec un avertissement.",
+    )
+    # Changer ces options rend la simulation précédente caduque.
+    options_doublons = (strategie, ignorer_doublons_probables)
+    if st.session_state.get(f"{cle_etat}_options_doublons") != options_doublons:
+        st.session_state.pop(f"{cle_etat}_rapport_prep", None)
+        st.session_state[f"{cle_etat}_options_doublons"] = options_doublons
 
 st.divider()
 
@@ -219,7 +236,9 @@ df_a_traiter = contenu.feuilles[feuille_choisie]
 
 def _preparer():
     if type_import == TypeImport.ENSEIGNANTS:
-        return import_service.preparer_import_enseignants(analyse, df_a_traiter, strategie_doublon=strategie)
+        return import_service.preparer_import_enseignants(
+            analyse, df_a_traiter, strategie_doublon=strategie, ignorer_doublons_probables=ignorer_doublons_probables
+        )
     elif type_import == TypeImport.HEURES:
         return import_service.preparer_import_heures(analyse, df_a_traiter, periode_id_choisie)
     elif type_import == TypeImport.REMUNERATIONS:
@@ -251,6 +270,18 @@ if rapport_prep is not None:
             f"{rapport_prep.nb_fiches_incompletes} enseignant(s) seront enregistrés avec une fiche à compléter "
             "(sexe, statut ou taux horaire absent). Ils n'entreront dans la paie qu'une fois leur fiche "
             "complétée dans Gestion › Enseignants."
+        )
+    if rapport_prep.nb_doublons_probables:
+        st.warning(
+            f"{rapport_prep.nb_doublons_probables} doublon(s) probable(s) : nom très proche d'un enseignant "
+            "existant ou d'une autre ligne du fichier. Vérifiez la liste ci-dessous"
+            + (" (lignes écartées)." if ignorer_doublons_probables
+               else " ; cochez « Écarter les doublons probables » pour ne pas les créer.")
+        )
+        st.dataframe(
+            [{"Ligne": l.numero_ligne, "Nom dans le fichier": f"{l.donnees.get('nom', '')} {l.donnees.get('prenom', '')}".strip(),
+              "Proche de": l.doublon_probable} for l in rapport_prep.lignes if l.doublon_probable],
+            use_container_width=True, hide_index=True,
         )
 
     if rapport_prep.toutes_anomalies:
