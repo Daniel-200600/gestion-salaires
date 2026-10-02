@@ -30,6 +30,7 @@ from typing import Dict, List, Optional, Tuple, Union
 import pandas as pd
 
 from database.connection import get_connection
+from services import licence_service
 from database.repositories import (
     enseignant_repository,
     heures_repository,
@@ -594,6 +595,7 @@ def preparer_import_enseignants(
 
     rapport = RapportPreparation()
     cles_vues_dans_fichier: Dict[tuple, int] = {}
+    places_demo = licence_service.places_restantes_demo(db_path)  # None : licence active, pas de limite
 
     for position, row in enumerate(df.to_dict(orient="records"), start=1):
         ligne = LigneImport(numero_ligne=position, donnees=row)
@@ -683,6 +685,10 @@ def preparer_import_enseignants(
             ligne.action = ActionLigne.MISE_A_JOUR
             ligne.cible_id = existant.id
         else:
+            if places_demo is not None and rapport.nb_creations >= places_demo:
+                _ajouter_erreur(ligne, "nom", nom_affiche, licence_service.message_limite_demo())
+                rapport.lignes.append(ligne)
+                continue
             ligne.action = ActionLigne.CREATION
 
         manquants = [libelle for champ, libelle in (("sexe", "sexe"), ("statut", "statut"),

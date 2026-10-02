@@ -27,6 +27,7 @@ from database.repositories import (
     retenue_repository,
 )
 from database.repositories import audit_log_repository
+from services import licence_service
 from models.audit_log import AuditLog
 from models.enseignant import Enseignant
 from models.enums import TypeActionAudit
@@ -114,6 +115,10 @@ def creer_enseignant(
     enseignant = _construire_enseignant_valide(
         nom, prenom, sexe, statut, taux_horaire, email, telephone, adresse, actif=True
     )
+    try:
+        licence_service.verifier_ajout_enseignants(1, db_path=db_path)
+    except licence_service.LicenceRequiseError as erreur:
+        raise EnseignantValidationError(str(erreur)) from erreur
     nouvel_id = enseignant_repository.creer(enseignant, db_path=db_path)
     return enseignant_repository.obtenir_par_id(nouvel_id, db_path=db_path)
 

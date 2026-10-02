@@ -93,6 +93,12 @@ def lister(inclure_inactifs: bool = False, db_path: DbPath = None) -> List[Ensei
         return [Enseignant.from_row(row) for row in rows]
 
 
+def compter(db_path: DbPath = None) -> int:
+    """Nombre total d'enseignants enregistrés, actifs ou non."""
+    with get_connection(db_path) as conn:
+        return conn.execute("SELECT COUNT(*) FROM enseignants").fetchone()[0]
+
+
 def rechercher(terme: str, inclure_inactifs: bool = False, db_path: DbPath = None) -> List[Enseignant]:
     """
     Recherche par nom, prénom ou nom complet (dans les deux ordres),

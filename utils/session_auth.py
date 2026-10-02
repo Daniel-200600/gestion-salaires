@@ -320,6 +320,18 @@ def exiger_permission(permission: str) -> None:
         st.stop()
 
 
+def _afficher_etat_licence() -> None:
+    from services import licence_service
+
+    etat = licence_service.etat_licence()
+    if etat.active:
+        st.caption(f"Licence : {etat.licence.etablissement}")
+    else:
+        st.caption(
+            f":orange[Mode démonstration ({licence_service.LIMITE_DEMO_ENSEIGNANTS} enseignants au maximum)]"
+        )
+
+
 def afficher_bandeau_utilisateur() -> None:
     """Affiche discrètement l'utilisateur connecté, un bouton de déconnexion, et le pied de page applicatif (module 20)."""
     from config.settings import NOM_APPLICATION, VERSION
@@ -334,3 +346,4 @@ def afficher_bandeau_utilisateur() -> None:
         _bouton_quitter("quitter_barre_laterale")
         st.divider()
         st.caption(f"{NOM_APPLICATION} — version {VERSION}")
+        _afficher_etat_licence()

@@ -1,4 +1,4 @@
-# Gestion des Salaires — v1.4.0
+# Gestion des Salaires — v1.5.0
 
 [![tests](https://github.com/Daniel-200600/gestion-salaires/actions/workflows/tests.yml/badge.svg)](https://github.com/Daniel-200600/gestion-salaires/actions/workflows/tests.yml)
 ![Python](https://img.shields.io/badge/python-3.11-blue)
@@ -20,6 +20,7 @@ Couvre l'intégralité du cycle de paie : gestion des enseignants et des périod
 - Modèles de bulletin importables (Word ou PDF, bulletin rempli ou modèle à balises)
 - Taux de taxe paramétrable (5 % par défaut, figé par période à la validation)
 - Changement de statut d'un enseignant (vacataire / permanent), journalisé
+- Licence d'utilisation par clé signée, liée à l'ordinateur (mode démonstration limité à 5 enseignants sans licence) ; les clés sont créées par l'auteur avec `outils/generer_licence.py`, à partir d'une clé privée conservée hors du projet
 - Reprise d'une liste d'enseignants existante (Excel, CSV, Word ou PDF), détection des doublons probables ; les informations manquantes se complètent plus tard, une par une ou toutes ensemble, les fiches incomplètes restant hors de la paie
 - Exports comptables (Excel)
 - Historique et reporting multi-périodes
@@ -82,7 +83,7 @@ Sauvegarde via l'API native SQLite (`sqlite3.Connection.backup()`), jamais une s
 
 ## Version
 
-**1.4.0** — voir `config/settings.py` (`VERSION`), source unique du numéro de version.
+**1.5.0** — voir `config/settings.py` (`VERSION`), source unique du numéro de version.
 
 ## Tests
 
@@ -90,7 +91,7 @@ Sauvegarde via l'API native SQLite (`sqlite3.Connection.backup()`), jamais une s
 python -m pytest -q
 ```
 
-Résultat de référence : **1563 passed, 3 skipped** (version 1.4.0 ; voir `docs/bulletins_taxe_statut.md`).
+Résultat de référence : **1580 passed, 3 skipped** (version 1.5.0 ; voir `docs/bulletins_taxe_statut.md`).
 
 ## Licence
 

@@ -2,7 +2,12 @@
 
 Gestion des Salaires est un logiciel de gestion de la paie des enseignants : saisie des heures et des éléments de rémunération, calcul du net à payer, bulletins de solde au format Word ou PDF, états comptables, contrôle puis clôture des périodes de paie. Il fonctionne entièrement sur l'ordinateur où il est installé : aucune donnée n'est envoyée sur Internet.
 
-## Nouveautés de la version 1.4.0
+## Nouveautés de la version 1.5.0
+
+- **Clé de licence** : le logiciel s'active avec une clé délivrée par l'auteur pour l'ordinateur de l'établissement (Administration › Licence). La clé est signée : elle ne peut être ni fabriquée, ni modifiée, ni utilisée sur un autre ordinateur.
+- **Mode démonstration** : sans licence, l'application reste utilisable avec 5 enseignants au maximum ; les données déjà enregistrées ne sont jamais bloquées.
+
+## Version 1.4.0
 
 - **Compléter les fiches en une fois** : un tableau sur la page Enseignants permet de renseigner le sexe, le statut et le taux horaire de toutes les fiches incomplètes, puis de tout enregistrer d'un clic.
 - **Liste à compléter en Excel** : à télécharger, faire remplir (cases manquantes surlignées), puis réimporter ; aucune information déjà enregistrée n'est effacée.
@@ -41,6 +46,8 @@ La base de données, les sauvegardes, les modèles de bulletin et les documents 
 ## Licence
 
 Logiciel propriétaire, tous droits réservés. Son utilisation est réservée aux établissements titulaires d'un contrat de licence écrit avec l'auteur, dans les limites de ce contrat. Il est interdit de le copier, de le revendre, de le prêter ou de le redistribuer sans autorisation écrite.
+
+Chaque licence est délivrée pour un ordinateur, sous la forme d'une clé d'activation (Administration › Licence). La licence active est indiquée en haut de cette page ; sans elle, le logiciel fonctionne en mode démonstration.
 
 ## Assistance
 

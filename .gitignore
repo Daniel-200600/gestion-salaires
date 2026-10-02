@@ -37,3 +37,6 @@ data/
 # School-specific header and logo (see config/etablissement_local.example.py)
 config/etablissement_local.py
 assets/logo_etablissement.png
+
+# Clés de licence (jamais dans le dépôt)
+*.cle

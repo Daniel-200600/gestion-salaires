@@ -10,6 +10,7 @@ Les présentes conditions encadrent l'utilisation du logiciel **Gestion des Sala
 
 - L'accès est réservé aux personnes à qui un administrateur a créé un compte.
 - Chaque compte est nominatif et associé à un rôle (Administrateur, Gestionnaire de paie, Consultation) qui détermine les fonctions accessibles.
+- Le logiciel est utilisé sous licence, sur l'ordinateur pour lequel la clé de licence a été délivrée par l'auteur. Sans licence valide, il fonctionne en mode démonstration (5 enseignants au maximum).
 - L'utilisation du logiciel vaut acceptation des présentes conditions. [Modalités d'information et d'acceptation des utilisateurs, à définir par l'établissement.]
 
 ## 3. Utilisation des comptes
@@ -80,4 +81,4 @@ Le logiciel peut être modifié pour corriger des anomalies ou faire évoluer se
 
 Pour toute question sur l'utilisation du logiciel, un compte ou une anomalie : [service ou personne à contacter et coordonnées, à compléter par l'établissement].
 
-Version du logiciel décrite : 1.4.0. [Date d'entrée en vigueur, à compléter.]
+Version du logiciel décrite : 1.5.0. [Date d'entrée en vigueur, à compléter.]

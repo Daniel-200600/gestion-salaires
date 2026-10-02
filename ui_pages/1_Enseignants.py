@@ -51,7 +51,7 @@ from utils.formatters import (
 init_database()
 
 
-from services import permission_service
+from services import licence_service, permission_service
 from services import administration_service
 from services.autorisation_service import AutorisationRefuseeError
 from utils.session_auth import exiger_permission, utilisateur_courant_id, utilisateur_courant_role
@@ -59,6 +59,13 @@ from utils.session_auth import exiger_permission, utilisateur_courant_id, utilis
 exiger_permission(permission_service.ENSEIGNANT_CONSULTER)
 
 st.title("Gestion des enseignants")
+
+_places_demo = licence_service.places_restantes_demo()
+if _places_demo is not None:
+    st.info(
+        f"Mode démonstration : {licence_service.LIMITE_DEMO_ENSEIGNANTS} enseignants au maximum "
+        f"({_places_demo} place(s) restante(s)). Un administrateur active la licence dans Administration › Licence."
+    )
 
 # =======================================================================
 # Zone 1 — Ajouter un enseignant

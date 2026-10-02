@@ -16,3 +16,13 @@ def db_path(tmp_path) -> Path:
     path = tmp_path / "test_app.db"
     init_database(db_path=path)
     return path
+
+
+@pytest.fixture(autouse=True)
+def licence_active_pour_les_tests(request, monkeypatch):
+    """Les tests travaillent avec une licence valide, sauf ceux marqués « mode_demo »."""
+    if "mode_demo" in request.keywords:
+        return
+    from services import licence_service
+
+    monkeypatch.setattr(licence_service, "licence_active", lambda: True)

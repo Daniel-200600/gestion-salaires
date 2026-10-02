@@ -83,6 +83,8 @@ analyse = Analysis(
         "pandas",
         # Bulletins PDF (modèles PDF importés et modèle PDF standard).
         "pymupdf",
+        # Vérification des clés de licence (services/licence_service.py).
+        "cryptography",
         *modules_application,
     ],
     hookspath=[],

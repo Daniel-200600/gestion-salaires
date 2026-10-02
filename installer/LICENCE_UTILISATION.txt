@@ -1,6 +1,6 @@
 ﻿CONTRAT DE LICENCE D'UTILISATION — GESTION DES SALAIRES
 
-Logiciel « Gestion des Salaires », version 1.4.0
+Logiciel « Gestion des Salaires », version 1.5.0
 Copyright (c) 2026 Tchomtchi Kamgang Daniel Merlys (Daniel Tchomtchi).
 Tous droits réservés.
 
@@ -18,6 +18,9 @@ ci-dessous. Si vous ne les acceptez pas, n'installez pas le logiciel.
    (ci-après « le licencié »), dans les limites de cet accord (nombre de
    postes, durée, prix). Sans un tel accord, aucune utilisation n'est
    autorisée.
+   Chaque poste est activé par une clé de licence que l'auteur délivre
+   pour l'ordinateur concerné. Sans clé valide, le logiciel fonctionne
+   en mode démonstration, limité à 5 enseignants.
 
 3. Interdictions
    Sauf autorisation écrite de l'auteur, le licencié s'interdit :
@@ -27,7 +30,8 @@ ci-dessous. Si vous ne les acceptez pas, n'installez pas le logiciel.
      sous-licencier ou de le mettre à la disposition de tiers ;
    - de le modifier, de le décompiler ou d'en extraire le code, sauf
      dans les cas expressément permis par la loi ;
-   - de retirer ou de modifier les mentions de propriété de l'auteur.
+   - de retirer ou de modifier les mentions de propriété de l'auteur ;
+   - de contourner ou de neutraliser le contrôle de la clé de licence.
 
 4. Données
    Les données saisies dans le logiciel (enseignants, paie, bulletins)

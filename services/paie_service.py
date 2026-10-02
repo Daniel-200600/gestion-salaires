@@ -71,7 +71,7 @@ from database.repositories import enseignant_repository, periode_repository
 from utils.validators import message_fiche_incomplete
 from models.enums import StatutPeriode
 from models.resultat_paie import ResultatPaie
-from services import heures_service, remuneration_service, retenue_service
+from services import heures_service, licence_service, remuneration_service, retenue_service
 from utils.money import arrondir_fcfa
 
 DbPath = Optional[Union[str, Path]]
@@ -132,6 +132,12 @@ def _obtenir_periode_prete_ou_lever(periode_id: int, db_path: DbPath):
             "Cette période est encore au statut Brouillon : elle n'est pas prête pour un "
             "calcul de paie (elle doit d'abord être ouverte)."
         )
+    if periode.statut == StatutPeriode.OUVERTE:
+        # Les périodes validées ou clôturées restent toujours consultables.
+        try:
+            licence_service.verifier_calcul_autorise(db_path=db_path)
+        except licence_service.LicenceRequiseError as erreur:
+            raise CalculPaieError(str(erreur)) from erreur
     return periode
 
 

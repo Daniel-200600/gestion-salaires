@@ -120,7 +120,19 @@ Déroulement :
 
 Pour revenir à l'état antérieur, restaurez `avant_reinitialisation_<date>.db` depuis l'onglet Restauration. Les fichiers générés se trouvent dans l'archive `Avant_Reinitialisation_<date>.zip`, dossier `documents/`.
 
-## 10. Maintenance
+## 10. Licence
+
+Le logiciel s'utilise avec une **clé de licence** délivrée par l'auteur pour un ordinateur donné. Onglet **Administration › Licence**.
+
+- **Obtenir une clé** : l'onglet affiche le **code de cet ordinateur** (quatre groupes de quatre caractères). Communiquez-le à l'auteur avec le nom de l'établissement. L'auteur vous remet une clé (texte commençant par « GPAIE1. ») ou un fichier `.cle`.
+- **Activer** : choisissez le fichier `.cle` ou collez la clé, puis cliquez sur **Activer la licence**. L'établissement, le numéro de licence et sa durée de validité s'affichent ; l'activation est inscrite au journal d'audit. La licence est aussi rappelée en bas de la barre latérale et sur la page À propos.
+- **Clé refusée** : une clé incomplète ou modifiée, délivrée pour un autre ordinateur ou expirée est refusée avec un message qui en donne la raison ; la licence en place n'est pas modifiée.
+- **Mode démonstration** : sans licence valide, l'application est limitée à 5 enseignants. Si la base en compte davantage (licence expirée, base installée sur un autre ordinateur), la paie des périodes ouvertes n'est plus calculée. Les données ne sont jamais bloquées : consultation, périodes validées ou clôturées, sauvegardes et restauration restent accessibles.
+- **Changement d'ordinateur** : la clé est liée à l'ordinateur. Elle reste valable après une mise à jour ou une réinstallation du logiciel, mais pas après le remplacement de l'ordinateur ou la réinstallation de Windows : demandez alors une nouvelle clé avec le nouveau code. Les données se transfèrent comme d'habitude par une sauvegarde suivie d'une restauration.
+- **Expiration** : une licence à durée limitée affiche sa date de fin ; un avertissement apparaît dans l'onglet Licence 30 jours avant. Une nouvelle clé s'active de la même manière et remplace l'ancienne.
+- La clé est enregistrée dans le fichier `licence.cle` du dossier de données ; elle n'est pas incluse dans les sauvegardes de la base, ni effacée par la réinitialisation des données.
+
+## 11. Maintenance
 
 - Consultez régulièrement **Notifications** : les alertes signalent notamment une sauvegarde absente ou ancienne et des documents manquants ou modifiés.
 - Consultez **Diagnostic** en cas de doute ; un état « problème détecté » doit être traité avant toute nouvelle opération de paie.

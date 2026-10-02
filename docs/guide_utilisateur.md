@@ -38,6 +38,8 @@ Le **Tableau de bord** affiche le nombre d'enseignants (dont les fiches à compl
 
 La page **À propos** indique la version installée, les nouveautés de chaque version, la licence et le contact de l'auteur. Indiquez ce numéro de version pour toute demande d'assistance.
 
+**Licence.** La licence active (nom de l'établissement) est rappelée en bas de la barre latérale. Si la mention « Mode démonstration » apparaît, aucune licence valide n'est active : l'application est limitée à 5 enseignants et la page Enseignants indique les places restantes. Seul un administrateur peut activer une licence (voir le guide administrateur).
+
 ## 3. Gestion des enseignants
 
 Page **Gestion › Enseignants**.

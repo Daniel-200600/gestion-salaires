@@ -17,13 +17,14 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 import hashlib
+from datetime import date
 import platform
 import sqlite3
 
 import streamlit as st
 
 from config.logging_config import lire_dernieres_lignes, obtenir_logger
-from config.settings import BACKUP_DIR, DB_PATH, MODELES_BULLETIN_DIR, NOM_APPLICATION, VERSION
+from config.settings import BACKUP_DIR, CONTACT_AUTEUR, DB_PATH, MODELES_BULLETIN_DIR, NOM_APPLICATION, VERSION
 from database.initialization import init_database
 from models.enums import RoleUtilisateur
 from services import (
@@ -31,6 +32,7 @@ from services import (
     backup_service,
     diagnostic_service,
     identite_etablissement_service,
+    licence_service,
     modele_bulletin_service,
     parametres_paie_service,
     parametres_service,
@@ -74,10 +76,10 @@ ROLES_PAR_LIBELLE = {libelle: role for role, libelle in LIBELLES_ROLES.items()}
 
 (
     onglet_parametres, onglet_modeles, onglet_utilisateurs, onglet_sauvegarde, onglet_restauration,
-    onglet_diagnostic, onglet_maintenance, onglet_logs, onglet_reinitialisation, onglet_apropos,
+    onglet_diagnostic, onglet_maintenance, onglet_logs, onglet_reinitialisation, onglet_licence, onglet_apropos,
 ) = st.tabs([
     "Paramètres", "Modèles de bulletin", "Utilisateurs", "Sauvegarde", "Restauration", "Diagnostic",
-    "Maintenance", "Journaux", "Réinitialisation des données", "À propos",
+    "Maintenance", "Journaux", "Réinitialisation des données", "Licence", "À propos",
 ])
 
 # =======================================================================
@@ -1023,6 +1025,54 @@ with onglet_reinitialisation:
             else:
                 st.session_state["rapport_reinitialisation"] = rapport
                 st.session_state["reinitialisation_compteur"] = compteur + 1
+                st.rerun()
+
+# =======================================================================
+# Onglet Licence
+# =======================================================================
+with onglet_licence:
+    st.subheader("Licence d'utilisation")
+    if (message_licence := st.session_state.pop("message_licence", None)) is not None:
+        st.success(message_licence)
+    etat = licence_service.etat_licence()
+    if etat.active:
+        licence = etat.licence
+        st.success(
+            f"Licence n° {licence.numero} active — {licence.etablissement} — {licence.libelle_validite}."
+        )
+        if licence.date_expiration is not None and (licence.date_expiration - date.today()).days <= 30:
+            st.warning("La licence arrive bientôt à expiration : contactez l'auteur pour la renouveler.")
+    else:
+        st.warning(
+            f"Mode démonstration. {etat.motif} Sans licence, l'application est limitée à "
+            f"{licence_service.LIMITE_DEMO_ENSEIGNANTS} enseignants. Les données ne sont jamais bloquées : "
+            "consultation, périodes validées ou clôturées et sauvegardes restent accessibles."
+        )
+
+    st.markdown("**Code de cet ordinateur**")
+    st.code(licence_service.code_machine(), language=None)
+    st.caption(
+        f"Communiquez ce code à l'auteur ({CONTACT_AUTEUR}) avec le nom de l'établissement pour obtenir une "
+        "clé de licence. La clé ne fonctionne que sur cet ordinateur ; elle reste valable après une mise à "
+        "jour ou une réinstallation du logiciel."
+    )
+
+    st.markdown("**Activer une licence**")
+    fichier_cle = st.file_uploader("Fichier de licence (.cle)", type=["cle"], max_upload_size=1)
+    texte_cle = st.text_area("… ou collez la clé reçue (elle commence par « GPAIE1. »)", height=100)
+    if st.button("Activer la licence", type="primary"):
+        cle_saisie = fichier_cle.getvalue().decode("utf-8", errors="replace") if fichier_cle else texte_cle
+        if not cle_saisie.strip():
+            st.error("Choisissez le fichier de licence ou collez la clé.")
+        else:
+            try:
+                licence = licence_service.activer_licence(cle_saisie, utilisateur=st.session_state.get("username"))
+            except licence_service.LicenceInvalideError as erreur:
+                st.error(str(erreur))
+            else:
+                st.session_state["message_licence"] = (
+                    f"Licence n° {licence.numero} activée pour {licence.etablissement}, {licence.libelle_validite}."
+                )
                 st.rerun()
 
 # =======================================================================
