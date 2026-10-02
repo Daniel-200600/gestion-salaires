@@ -17,6 +17,8 @@ Usage (sur une machine Windows, une fois PyInstaller installé) :
 
 from pathlib import Path
 
+from PyInstaller.utils.hooks import collect_data_files, collect_submodules, copy_metadata
+
 RACINE = Path(SPECPATH)  # noqa: F821 — SPECPATH est injecté par PyInstaller à l'exécution du spec
 
 block_cipher = None
@@ -34,8 +36,10 @@ donnees_incluses = [
     (str(RACINE / "templates" / "bulletin_modele_standard.pdf"), "templates"),
     (str(RACINE / "templates" / "bulletin_modele_standard.json"), "templates"),
     (str(RACINE / "database" / "schema.sql"), "database"),
-    # Identité visuelle : favicon, logo (affichés dans le navigateur).
-    (str(RACINE / "assets"), "assets"),
+    # Identité visuelle de l'application (jamais le logo d'un établissement :
+    # assets/logo_etablissement.png reste hors de l'exécutable).
+    *[(str(RACINE / "assets" / nom), "assets") for nom in (
+        "favicon.png", "favicon.ico", "apple-touch-icon.png", "logo_horizontal.png", "logo_symbole.png")],
     # Configuration Streamlit de production (thème, barre d'outils).
     (str(RACINE / ".streamlit" / "config.toml"), ".streamlit"),
     # Documentation intégrée affichée dans l'application.
@@ -43,6 +47,22 @@ donnees_incluses = [
     (str(RACINE / "docs" / "guide_administrateur.md"), "docs"),
     (str(RACINE / "docs" / "politique_confidentialite.md"), "docs"),
     (str(RACINE / "docs" / "conditions_utilisation.md"), "docs"),
+]
+# Streamlit lit ses propres fichiers (interface web, métadonnées de paquet)
+# à l'exécution : ils doivent être embarqués explicitement.
+# Sans les exemples et « skills » de développement livrés avec Streamlit
+# (streamlit/.agents/...) : inutiles, et leurs chemins très profonds
+# dépassent la limite de 260 caractères de Windows à l'installation.
+donnees_incluses += [
+    (source, destination) for source, destination in collect_data_files("streamlit")
+    if ".agents" not in Path(source).parts
+] + copy_metadata("streamlit")
+
+# app.py et ui_pages/ sont exécutés par Streamlit, pas importés : PyInstaller
+# ne voit donc pas les modules qu'ils utilisent. On les déclare tous.
+modules_application = [
+    module for paquet in ("config", "database", "exports", "models", "services", "utils")
+    for module in collect_submodules(paquet)
 ]
 
 analyse = Analysis(
@@ -62,6 +82,7 @@ analyse = Analysis(
         "pandas",
         # Bulletins PDF (modèles PDF importés et modèle PDF standard).
         "pymupdf",
+        *modules_application,
     ],
     hookspath=[],
     hooksconfig={},
@@ -75,20 +96,19 @@ analyse = Analysis(
 
 pyz = PYZ(analyse.pure, analyse.zipped_data, cipher=block_cipher)
 
+# Mode « dossier » (onedir) : démarrage rapide, sans décompression à chaque
+# lancement ; c'est ce dossier que l'installateur (installer/GestionPaie.iss)
+# copie sur le poste.
 exe = EXE(
     pyz,
     analyse.scripts,
-    analyse.binaries,
-    analyse.zipfiles,
-    analyse.datas,
     [],
+    exclude_binaries=True,
     name="GestionPaie",
     debug=False,
     bootloader_ignore_signals=False,
     strip=False,
-    upx=True,
-    upx_exclude=[],
-    runtime_tmpdir=None,
+    upx=False,
     console=False,
     disable_windowed_traceback=False,
     argv_emulation=False,
@@ -96,4 +116,14 @@ exe = EXE(
     codesign_identity=None,
     entitlements_file=None,
     icon=str(RACINE / "assets" / "favicon.ico"),
+)
+
+coll = COLLECT(
+    exe,
+    analyse.binaries,
+    analyse.zipfiles,
+    analyse.datas,
+    strip=False,
+    upx=False,
+    name="GestionPaie",
 )

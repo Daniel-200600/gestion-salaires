@@ -71,18 +71,21 @@ def main() -> None:
 
     Timer(1.5, _ouvrir_navigateur, args=(PORT_PAR_DEFAUT,)).start()
 
-    bootstrap.run(
-        str(chemin_app),
-        is_hello=False,
-        args=[],
-        flag_options={
-            **options_configuration_production(),
-            "server.port": PORT_PAR_DEFAUT,
-            "server.headless": False,
-            "browser.gatherUsageStats": False,
-            "server.fileWatcherType": "none",
-        },
-    )
+    options = {
+        **options_configuration_production(),
+        # Une fois empaqueté, Streamlit ne se trouve plus dans site-packages
+        # et se croirait en mode développement : il ne servirait alors pas
+        # son interface web (page blanche, erreur 404).
+        "global.developmentMode": False,
+        "server.port": PORT_PAR_DEFAUT,
+        "server.headless": False,
+        "browser.gatherUsageStats": False,
+        "server.fileWatcherType": "none",
+    }
+    # Comme `streamlit run` : les options doivent être chargées AVANT le
+    # démarrage, bootstrap.run() ne fait que surveiller leurs changements.
+    bootstrap.load_config_options(flag_options=options)
+    bootstrap.run(str(chemin_app), is_hello=False, args=[], flag_options=options)
 
 
 if __name__ == "__main__":

@@ -1,0 +1,50 @@
+﻿CONTRAT DE LICENCE D'UTILISATION — GESTION DES SALAIRES
+
+Logiciel « Gestion des Salaires », version 1.1.0
+Copyright (c) 2026 Tchomtchi Kamgang Daniel Merlys (Daniel Tchomtchi).
+Tous droits réservés.
+
+En installant ou en utilisant ce logiciel, vous acceptez les conditions
+ci-dessous. Si vous ne les acceptez pas, n'installez pas le logiciel.
+
+1. Propriété
+   Le logiciel reste la propriété exclusive de son auteur. Ce contrat
+   n'accorde qu'un droit d'utilisation ; aucun droit de propriété n'est
+   cédé.
+
+2. Droit d'utilisation
+   L'utilisation du logiciel est réservée à la personne ou à
+   l'organisation qui a conclu avec l'auteur un accord de licence écrit
+   (ci-après « le licencié »), dans les limites de cet accord (nombre de
+   postes, durée, prix). Sans un tel accord, aucune utilisation n'est
+   autorisée.
+
+3. Interdictions
+   Sauf autorisation écrite de l'auteur, le licencié s'interdit :
+   - de copier le logiciel ou de l'installer au-delà de ce que prévoit
+     son accord de licence ;
+   - de le vendre, de le louer, de le prêter, de le céder, de le
+     sous-licencier ou de le mettre à la disposition de tiers ;
+   - de le modifier, de le décompiler ou d'en extraire le code, sauf
+     dans les cas expressément permis par la loi ;
+   - de retirer ou de modifier les mentions de propriété de l'auteur.
+
+4. Données
+   Les données saisies dans le logiciel (enseignants, paie, bulletins)
+   appartiennent au licencié et restent enregistrées sur ses propres
+   ordinateurs. L'auteur n'y a pas accès. La désinstallation du logiciel
+   ne supprime pas ces données. Il appartient au licencié d'en effectuer
+   des sauvegardes régulières.
+
+5. Absence de garantie
+   Le logiciel est fourni « tel quel ». Le licencié vérifie les calculs
+   et les documents produits avant tout usage officiel. Dans les limites
+   permises par la loi, l'auteur ne peut être tenu responsable des
+   dommages indirects résultant de l'utilisation du logiciel.
+
+6. Résiliation
+   Tout manquement à ce contrat met fin automatiquement au droit
+   d'utilisation. Le licencié doit alors cesser d'utiliser le logiciel
+   et le désinstaller.
+
+Contact : tchomtchidaniel@gmail.com

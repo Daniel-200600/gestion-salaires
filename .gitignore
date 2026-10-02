@@ -9,6 +9,7 @@ env/
 # Packaging
 build/
 dist/
+dist_installer/
 *.exe
 
 # Runtime data written by the application (real payroll data -- never commit)
