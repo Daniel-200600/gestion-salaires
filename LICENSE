@@ -1,21 +1,40 @@
-MIT License
+Licence propriétaire — Gestion des Salaires
+Copyright (c) 2026 Tchomtchi Kamgang Daniel Merlys (Daniel Tchomtchi).
+Tous droits réservés.
 
-Copyright (c) 2026 Tchomtchi Daniel
+1. Le code source de ce dépôt est rendu visible uniquement pour être
+   consulté et évalué (portfolio, présentation du travail de l'auteur).
 
-Permission is hereby granted, free of charge, to any person obtaining a copy
-of this software and associated documentation files (the "Software"), to deal
-in the Software without restriction, including without limitation the rights
-to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-copies of the Software, and to permit persons to whom the Software is
-furnished to do so, subject to the following conditions:
+2. Sauf autorisation écrite et préalable de l'auteur, il est interdit :
+   - d'utiliser le logiciel, y compris en interne au sein d'un
+     établissement, d'une entreprise ou d'une administration ;
+   - de le copier, de le modifier ou d'en créer des œuvres dérivées ;
+   - de le distribuer, de le vendre, de le louer, de le sous-licencier ou
+     de le proposer comme service à des tiers ;
+   - d'en intégrer tout ou partie dans un autre produit.
 
-The above copyright notice and this permission notice shall be included in all
-copies or substantial portions of the Software.
+3. Le droit d'utiliser le logiciel est accordé au cas par cas, par un
+   contrat de licence écrit signé avec l'auteur. Contact :
+   tchomtchidaniel@gmail.com.
 
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-SOFTWARE.
+4. La fonction « fork » de GitHub ne confère aucun droit au-delà de ce que
+   prévoient les conditions d'utilisation de GitHub.
+
+5. Le logiciel est fourni « tel quel », sans garantie d'aucune sorte.
+   L'auteur ne peut être tenu responsable d'aucun dommage résultant de son
+   utilisation non autorisée.
+
+------------------------------------------------------------------------
+
+Proprietary licence — Gestion des Salaires
+Copyright (c) 2026 Tchomtchi Kamgang Daniel Merlys (Daniel Tchomtchi).
+All rights reserved.
+
+The source code in this repository is made visible for review and
+evaluation only. Without the author's prior written permission, you may
+not use (including internally within any organisation), copy, modify,
+create derivative works from, distribute, sell, rent, sublicense or offer
+as a service this software, or include any part of it in another product.
+Usage rights are granted case by case under a written licence agreement
+(contact: tchomtchidaniel@gmail.com). The software is provided "as is",
+without warranty of any kind.

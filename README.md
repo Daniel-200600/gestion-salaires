@@ -1,6 +1,10 @@
 # Gestion des Salaires — v1.1.0
 
-Application de gestion de la paie des enseignants, développée en Python (Streamlit + SQLite) pour un établissement scolaire bilingue au Cameroun.
+[![tests](https://github.com/Daniel-200600/gestion-salaires/actions/workflows/tests.yml/badge.svg)](https://github.com/Daniel-200600/gestion-salaires/actions/workflows/tests.yml)
+![Python](https://img.shields.io/badge/python-3.11-blue)
+![License](https://img.shields.io/badge/license-propri%C3%A9taire-lightgrey)
+
+Application de gestion de la paie des enseignants, développée en Python (Streamlit + SQLite) pour les établissements scolaires au Cameroun.
 
 ## Présentation
 
@@ -85,4 +89,11 @@ Sauvegarde via l'API native SQLite (`sqlite3.Connection.backup()`), jamais une s
 python -m pytest -q
 ```
 
-Résultat de référence : **1480 passed, 3 skipped** (version 1.1.0 ; voir `docs/bulletins_taxe_statut.md`).
+Résultat de référence : **1487 passed, 3 skipped** (version 1.1.0 ; voir `docs/bulletins_taxe_statut.md`).
+
+## Licence
+
+Logiciel propriétaire, tous droits réservés (voir [LICENSE](LICENSE)). Le code
+est visible à titre de présentation ; toute utilisation, copie, modification
+ou distribution requiert une licence écrite de l'auteur. Les versions publiées
+avant ce changement l'avaient été sous licence MIT.
