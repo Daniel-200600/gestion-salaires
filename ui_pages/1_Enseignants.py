@@ -24,6 +24,7 @@ from services.enseignant_service import (
     creer_enseignant,
     desactiver_enseignant,
     lister_enseignants,
+    lister_enseignants_a_completer,
     modifier_enseignant,
     obtenir_dependances_enseignant,
     obtenir_enseignant,
@@ -103,18 +104,30 @@ st.divider()
 # =======================================================================
 st.subheader("Liste des enseignants")
 
-col_recherche, col_filtre = st.columns([3, 1])
+fiches_a_completer = lister_enseignants_a_completer()
+if fiches_a_completer:
+    st.warning(
+        f"{len(fiches_a_completer)} fiche(s) à compléter (sexe, statut ou taux horaire manquant, souvent après "
+        "l'import d'une liste existante). Ces enseignants n'entrent pas dans la paie tant que leur fiche est "
+        "incomplète : sélectionnez-les ci-dessous, onglet « Modifier »."
+    )
+
+col_recherche, col_filtre, col_incomplets = st.columns([3, 1, 1])
 with col_recherche:
     terme_recherche = st.text_input(
         "Rechercher (nom, prénom ou nom complet)", key="champ_recherche_enseignant"
     )
 with col_filtre:
     inclure_inactifs = st.checkbox("Inclure les enseignants désactivés", value=False)
+with col_incomplets:
+    seulement_a_completer = st.checkbox("Seulement les fiches à compléter", value=False)
 
 if terme_recherche:
     enseignants = rechercher_enseignants(terme_recherche, inclure_inactifs=inclure_inactifs)
 else:
     enseignants = lister_enseignants(inclure_inactifs=inclure_inactifs)
+if seulement_a_completer:
+    enseignants = [e for e in enseignants if not e.est_complet]
 
 if not enseignants:
     st.info("Aucune donnée disponible. Aucun enseignant ne correspond aux critères affichés.")
@@ -126,7 +139,8 @@ else:
             "Prénom": enseignant.prenom,
             "Sexe": libelle_sexe(enseignant.sexe),
             "Statut": libelle_statut(enseignant.statut),
-            "Taux horaire (FCFA)": enseignant.taux_horaire,
+            "Taux horaire": formater_fcfa(enseignant.taux_horaire),
+            "Fiche": "Complète" if enseignant.est_complet else "À compléter : " + ", ".join(enseignant.champs_manquants),
             "État": libelle_actif(enseignant.actif),
         }
         for enseignant in enseignants
@@ -145,7 +159,8 @@ if not enseignants:
     st.info("Aucun enseignant disponible pour les actions.")
 else:
     options_enseignants = {
-        f"{enseignant.prenom} {enseignant.nom} (id {enseignant.id})": enseignant.id
+        f"{enseignant.prenom} {enseignant.nom}".strip()
+        + f" (id {enseignant.id})" + ("" if enseignant.est_complet else " — à compléter"): enseignant.id
         for enseignant in enseignants
     }
     choix_libelle = st.selectbox("Sélectionner un enseignant", list(options_enseignants.keys()))
@@ -158,6 +173,11 @@ else:
 
     # --- Fiche détaillée -----------------------------------------------
     with onglet_fiche:
+        if not enseignant_selectionne.est_complet:
+            st.warning(
+                "Fiche à compléter : " + ", ".join(enseignant_selectionne.champs_manquants)
+                + ". Cet enseignant n'entre pas dans la paie tant qu'elle est incomplète (onglet « Modifier »)."
+            )
         col_a, col_b = st.columns(2)
         with col_a:
             st.write(f"**Nom :** {enseignant_selectionne.nom}")
@@ -190,14 +210,18 @@ else:
                 sexe_modifie_libelle = st.selectbox(
                     "Sexe *",
                     OPTIONS_SEXE,
-                    index=OPTIONS_SEXE.index(libelle_sexe(enseignant_selectionne.sexe)),
+                    index=(OPTIONS_SEXE.index(libelle_sexe(enseignant_selectionne.sexe))
+                           if enseignant_selectionne.sexe is not None else None),
+                    placeholder="À renseigner",
                 )
                 taux_modifie = st.number_input(
                     "Taux horaire (FCFA) *",
                     min_value=0,
                     step=100,
                     format="%d",
-                    value=int(enseignant_selectionne.taux_horaire),
+                    value=(int(enseignant_selectionne.taux_horaire)
+                           if enseignant_selectionne.taux_horaire is not None else None),
+                    placeholder="À renseigner",
                 )
                 email_modifie = st.text_input("Email", value=enseignant_selectionne.email or "")
 
@@ -206,13 +230,18 @@ else:
                 statut_modifie_libelle = st.selectbox(
                     "Statut *",
                     OPTIONS_STATUT,
-                    index=OPTIONS_STATUT.index(
-                        libelle_statut(enseignant_selectionne.statut)
-                    ),
+                    index=(OPTIONS_STATUT.index(libelle_statut(enseignant_selectionne.statut))
+                           if enseignant_selectionne.statut is not None else None),
+                    placeholder="À renseigner",
                 )
                 telephone_modifie = st.text_input("Téléphone", value=enseignant_selectionne.telephone or "")
                 adresse_modifiee = st.text_input("Adresse", value=enseignant_selectionne.adresse or "")
 
+            if not enseignant_selectionne.est_complet:
+                st.caption(
+                    "Renseignez les informations manquantes. Une information encore inconnue peut rester "
+                    "vide : la fiche restera « à compléter »."
+                )
             soumis_modification = st.form_submit_button(
                 "Enregistrer les modifications", disabled=not peut_modifier_enseignant
             )
@@ -223,8 +252,8 @@ else:
                         enseignant_id=enseignant_id,
                         nom=nom_modifie,
                         prenom=prenom_modifie,
-                        sexe=sexe_depuis_libelle(sexe_modifie_libelle),
-                        statut=statut_depuis_libelle(statut_modifie_libelle),
+                        sexe=sexe_depuis_libelle(sexe_modifie_libelle) if sexe_modifie_libelle else None,
+                        statut=statut_depuis_libelle(statut_modifie_libelle) if statut_modifie_libelle else None,
                         taux_horaire=taux_modifie,
                         email=email_modifie,
                         telephone=telephone_modifie,

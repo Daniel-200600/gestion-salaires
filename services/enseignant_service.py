@@ -33,6 +33,7 @@ from models.enums import TypeActionAudit
 from utils.validators import (
     EnseignantValidationError,
     nettoyer_champ_optionnel,
+    nettoyer_texte,
     valider_nom_ou_prenom,
     valider_sexe,
     valider_statut,
@@ -54,6 +55,8 @@ __all__ = [
     "lister_enseignants",
     "rechercher_enseignants",
     "modifier_enseignant",
+    "lister_enseignants_a_completer",
+    "lister_enseignants_payables",
     "changer_statut_enseignant",
     "desactiver_enseignant",
     "reactiver_enseignant",
@@ -161,9 +164,20 @@ def modifier_enseignant(
     `changer_statut_enseignant`).
     """
     existant = obtenir_enseignant(enseignant_id, db_path=db_path)  # lève si inexistant
-    enseignant_modifie = _construire_enseignant_valide(
-        nom, prenom, sexe, statut, taux_horaire, email, telephone, adresse,
-        enseignant_id=existant.id,
+    # Compléter une fiche importée : une information encore inconnue (None)
+    # garde sa valeur actuelle, éventuellement vide ; elle n'efface jamais
+    # une valeur déjà renseignée. Prénom vide accepté seulement s'il l'était.
+    enseignant_modifie = Enseignant(
+        id=existant.id,
+        nom=valider_nom_ou_prenom(nom, "nom"),
+        prenom=(nettoyer_texte(prenom) if not existant.prenom and not nettoyer_texte(prenom)
+                else valider_nom_ou_prenom(prenom, "prenom")),
+        sexe=existant.sexe if _vide(sexe) else valider_sexe(sexe),
+        statut=existant.statut if _vide(statut) else valider_statut(statut),
+        taux_horaire=existant.taux_horaire if _vide(taux_horaire) else valider_taux_horaire(taux_horaire),
+        email=nettoyer_champ_optionnel(email),
+        telephone=nettoyer_champ_optionnel(telephone),
+        adresse=nettoyer_champ_optionnel(adresse),
         actif=existant.actif,
     )
     enseignant_repository.mettre_a_jour(enseignant_modifie, db_path=db_path)
@@ -172,7 +186,21 @@ def modifier_enseignant(
     return enseignant_repository.obtenir_par_id(enseignant_id, db_path=db_path)
 
 
-_LIBELLES_STATUT = {"V": "Vacataire", "P": "Permanent"}
+_LIBELLES_STATUT = {"V": "Vacataire", "P": "Permanent", None: "non renseigné"}
+
+
+def _vide(valeur) -> bool:
+    return valeur is None or (isinstance(valeur, str) and not valeur.strip())
+
+
+def lister_enseignants_a_completer(db_path: DbPath = None) -> List[Enseignant]:
+    """Enseignants actifs dont la fiche est incomplète (exclus de la paie tant qu'elle l'est)."""
+    return [e for e in enseignant_repository.lister(db_path=db_path) if not e.est_complet]
+
+
+def lister_enseignants_payables(db_path: DbPath = None) -> List[Enseignant]:
+    """Enseignants actifs à fiche complète : les seuls proposés pour la saisie et le calcul de la paie."""
+    return [e for e in enseignant_repository.lister(db_path=db_path) if e.est_complet]
 
 
 def _journaliser_changement_statut(enseignant: Enseignant, nouveau_statut, utilisateur: Optional[str],
@@ -181,7 +209,7 @@ def _journaliser_changement_statut(enseignant: Enseignant, nouveau_statut, utili
         AuditLog(
             type_action=TypeActionAudit.STATUT_ENSEIGNANT_MODIFIE, entite="enseignant", entite_id=enseignant.id,
             utilisateur=utilisateur,
-            details=(f"{enseignant.nom} {enseignant.prenom} : {_LIBELLES_STATUT[enseignant.statut.value]} -> "
+            details=(f"{enseignant.nom} {enseignant.prenom} : {_LIBELLES_STATUT[enseignant.statut.value if enseignant.statut else None]} -> "
                      f"{_LIBELLES_STATUT[nouveau_statut.value]}"),
         ),
         db_path=db_path,

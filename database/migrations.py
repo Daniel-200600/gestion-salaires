@@ -25,6 +25,7 @@ l'histoire additive du projet).
 """
 
 import logging
+import re
 import sqlite3
 from typing import Optional
 
@@ -149,3 +150,71 @@ def ajouter_colonnes_manquantes(conn: sqlite3.Connection) -> list:
     if ajoutees:
         conn.commit()
     return ajoutees
+
+
+# ---------------------------------------------------------------------
+# Fiches enseignant complétables plus tard (sexe, statut, taux facultatifs)
+# ---------------------------------------------------------------------
+
+_COLONNES_ENSEIGNANTS = (
+    "id, nom, prenom, sexe, statut, taux_horaire, email, telephone, adresse, actif, "
+    "date_creation, date_modification"
+)
+
+
+def _enseignants_necessite_migration(conn: sqlite3.Connection) -> bool:
+    sql_existant = _sql_table_existante(conn, "enseignants")
+    return sql_existant is not None and re.search(r"\bsexe\s+TEXT\s+NOT\s+NULL", sql_existant) is not None
+
+
+def rendre_fiches_enseignants_completables(conn: sqlite3.Connection, schema_sql: str) -> bool:
+    """
+    Permet d'enregistrer un enseignant sans sexe, statut ni taux horaire
+    (fiche importée incomplète, complétée plus tard).
+
+    SQLite ne sait pas retirer un NOT NULL en place : la table est
+    reconstruite selon la procédure documentée par SQLite (« making other
+    kinds of table schema changes ») — nouvelle table, copie intégrale,
+    suppression de l'ancienne, renommage — clés étrangères suspendues le
+    temps de l'opération puis vérifiées (PRAGMA foreign_key_check) avant
+    validation. Les tables liées (heures, primes, retenues, bulletins...)
+    gardent leurs références. Tout échec annule l'ensemble.
+
+    Retourne True si la migration a eu lieu, False si la base était déjà à jour.
+    """
+    if not _enseignants_necessite_migration(conn):
+        return False
+    correspondance = re.search(r"CREATE TABLE IF NOT EXISTS enseignants \((.*?)\n\);", schema_sql, re.S)
+    if correspondance is None:
+        raise RuntimeError("Définition de la table enseignants introuvable dans schema.sql.")
+    definition = correspondance.group(1)
+
+    logger.info("Migration de enseignants : sexe, statut et taux horaire deviennent facultatifs.")
+    conn.commit()
+    conn.execute("PRAGMA foreign_keys = OFF")
+    conn.execute("PRAGMA legacy_alter_table = ON")
+    try:
+        conn.execute("BEGIN")
+        conn.execute(f"CREATE TABLE enseignants_migration ({definition}\n)")
+        conn.execute(
+            f"INSERT INTO enseignants_migration ({_COLONNES_ENSEIGNANTS}) "
+            f"SELECT {_COLONNES_ENSEIGNANTS} FROM enseignants"
+        )
+        nb_avant = conn.execute("SELECT COUNT(*) FROM enseignants").fetchone()[0]
+        conn.execute("DROP TABLE enseignants")
+        conn.execute("ALTER TABLE enseignants_migration RENAME TO enseignants")
+        nb_apres = conn.execute("SELECT COUNT(*) FROM enseignants").fetchone()[0]
+        if nb_apres != nb_avant:
+            raise RuntimeError(f"Migration enseignants incomplète : {nb_avant} ligne(s) avant, {nb_apres} après.")
+        if conn.execute("PRAGMA foreign_key_check").fetchall():
+            raise RuntimeError("Migration enseignants : références orphelines détectées.")
+        conn.commit()
+    except Exception:
+        conn.rollback()
+        logger.error("Échec de la migration enseignants — la base a été restaurée à son état antérieur.")
+        raise
+    finally:
+        conn.execute("PRAGMA legacy_alter_table = OFF")
+        conn.execute("PRAGMA foreign_keys = ON")
+    logger.info("Migration de enseignants terminée (%d enseignant(s) conservé(s)).", nb_apres)
+    return True

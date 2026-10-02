@@ -160,13 +160,15 @@ def test_donnees_valides_toutes_creees(tmp_path):
     assert rapport.nb_erreurs == 0
 
 
-def test_type_invalide_taux_horaire_rejete(tmp_path):
+def test_taux_horaire_illisible_fiche_a_completer(tmp_path):
     df = pd.DataFrame({"Nom": ["A"], "Prenom": ["X"], "Sexe": ["M"], "Statut": ["P"], "taux_horaire": ["abc"]})
     contenu = import_service.lire_fichier(_fichier_xlsx(tmp_path, df), "test.xlsx")
     analyse = import_service.analyser_fichier(contenu, TypeImport.ENSEIGNANTS)
     rapport = import_service.preparer_import_enseignants(analyse, contenu.feuilles[analyse.feuille_choisie])
-    assert rapport.nb_rejetees == 1
-    assert rapport.nb_erreurs == 1
+    # Valeur illisible : la ligne n'est plus rejetée, la fiche est à compléter.
+    assert rapport.nb_creations == 1 and rapport.nb_erreurs == 0
+    assert rapport.lignes[0].donnees["taux_horaire"] is None
+    assert rapport.nb_fiches_incompletes == 1
 
 
 def test_champ_obligatoire_manquant_rejete(tmp_path):
@@ -177,20 +179,22 @@ def test_champ_obligatoire_manquant_rejete(tmp_path):
     assert rapport.nb_rejetees == 1
 
 
-def test_valeur_negative_taux_rejetee(tmp_path):
+def test_taux_negatif_fiche_a_completer(tmp_path):
     df = pd.DataFrame({"Nom": ["A"], "Prenom": ["X"], "Sexe": ["M"], "Statut": ["P"], "taux_horaire": [-500]})
     contenu = import_service.lire_fichier(_fichier_xlsx(tmp_path, df), "test.xlsx")
     analyse = import_service.analyser_fichier(contenu, TypeImport.ENSEIGNANTS)
     rapport = import_service.preparer_import_enseignants(analyse, contenu.feuilles[analyse.feuille_choisie])
-    assert rapport.nb_rejetees == 1
+    assert rapport.nb_creations == 1 and rapport.lignes[0].donnees["taux_horaire"] is None
+    assert rapport.nb_fiches_incompletes == 1
 
 
-def test_statut_invalide_rejete(tmp_path):
+def test_statut_illisible_fiche_a_completer(tmp_path):
     df = pd.DataFrame({"Nom": ["A"], "Prenom": ["X"], "Sexe": ["M"], "Statut": ["Z"], "taux_horaire": [1000]})
     contenu = import_service.lire_fichier(_fichier_xlsx(tmp_path, df), "test.xlsx")
     analyse = import_service.analyser_fichier(contenu, TypeImport.ENSEIGNANTS)
     rapport = import_service.preparer_import_enseignants(analyse, contenu.feuilles[analyse.feuille_choisie])
-    assert rapport.nb_rejetees == 1
+    assert rapport.nb_creations == 1 and rapport.lignes[0].donnees["statut"] is None
+    assert any("non reconnu" in a.message for a in rapport.toutes_anomalies)
 
 
 # ---------------------------------------------------------------------

@@ -67,6 +67,22 @@ def detecter_alertes_enseignants(db_path: DbPath = None) -> RapportDetection:
             rapport.alertes_actives.append(alerte.cle_deduplication)
             rapport.nombre_creees_ou_maj += 1
 
+    # Fiches importées incomplètes : une seule alerte groupée (un import
+    # peut en créer des dizaines), résolue d'elle-même une fois complétées.
+    a_completer = enseignant_service.lister_enseignants_a_completer(db_path=db_path)
+    if a_completer:
+        alerte = alert_service.creer_ou_mettre_a_jour_alerte(
+            type_alerte="FICHES_INCOMPLETES", niveau=NiveauAlerte.AVERTISSEMENT,
+            titre=f"{len(a_completer)} fiche(s) d'enseignant à compléter",
+            message=(
+                f"{len(a_completer)} enseignant(s) actif(s) sans sexe, statut ou taux horaire n'entrent pas dans "
+                "la paie. Complétez leur fiche dans Gestion › Enseignants."
+            ),
+            source=SOURCE_ENSEIGNANTS, db_path=db_path,
+        )
+        rapport.alertes_actives.append(alerte.cle_deduplication)
+        rapport.nombre_creees_ou_maj += 1
+
     rapport.nombre_resolues_automatiquement += alert_service.resoudre_alertes_obsoletes(
         SOURCE_ENSEIGNANTS, rapport.alertes_actives, db_path=db_path
     )

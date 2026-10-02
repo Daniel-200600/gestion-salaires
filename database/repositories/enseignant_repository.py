@@ -26,6 +26,11 @@ from models.enseignant import Enseignant
 DbPath = Optional[Union[str, Path]]
 
 
+def _valeur(enumeration) -> Optional[str]:
+    """Valeur d'une énumération (sexe, statut), ou NULL pour une fiche incomplète."""
+    return enumeration.value if enumeration is not None else None
+
+
 def creer(enseignant: Enseignant, db_path: DbPath = None, conn: "Optional[sqlite3.Connection]" = None) -> int:
     """
     Insère un nouvel enseignant et retourne son id généré.
@@ -39,7 +44,7 @@ def creer(enseignant: Enseignant, db_path: DbPath = None, conn: "Optional[sqlite
         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
     """
     parametres = (
-        enseignant.nom, enseignant.prenom, enseignant.sexe.value, enseignant.statut.value,
+        enseignant.nom, enseignant.prenom or "", _valeur(enseignant.sexe), _valeur(enseignant.statut),
         enseignant.taux_horaire, enseignant.email, enseignant.telephone, enseignant.adresse, enseignant.actif,
     )
     if conn is not None:
@@ -134,7 +139,7 @@ def mettre_a_jour(
         WHERE id = ?
     """
     parametres = (
-        enseignant.nom, enseignant.prenom, enseignant.sexe.value, enseignant.statut.value,
+        enseignant.nom, enseignant.prenom or "", _valeur(enseignant.sexe), _valeur(enseignant.statut),
         enseignant.taux_horaire, enseignant.email, enseignant.telephone, enseignant.adresse, enseignant.id,
     )
     if conn is not None:

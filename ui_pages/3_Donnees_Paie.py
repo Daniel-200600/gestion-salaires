@@ -82,8 +82,15 @@ if lecture_seule:
     tous_enseignants = enseignant_service.lister_enseignants(inclure_inactifs=True)
     enseignants_disponibles = [e for e in tous_enseignants if e.id in ids_avec_donnees]
 else:
-    # Une nouvelle saisie n'est jamais proposée pour un enseignant désactivé.
-    enseignants_disponibles = enseignant_service.lister_enseignants(inclure_inactifs=False)
+    # Une nouvelle saisie n'est jamais proposée pour un enseignant désactivé,
+    # ni pour une fiche incomplète (sexe, statut ou taux horaire manquant).
+    enseignants_disponibles = enseignant_service.lister_enseignants_payables()
+    _fiches_a_completer = enseignant_service.lister_enseignants_a_completer()
+    if _fiches_a_completer:
+        st.info(
+            f"{len(_fiches_a_completer)} enseignant(s) non proposé(s) ici : fiche à compléter (sexe, statut ou "
+            "taux horaire manquant). Complétez-la dans Gestion › Enseignants pour l'inclure dans la paie."
+        )
 
 if not enseignants_disponibles:
     message = (

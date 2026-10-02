@@ -17,15 +17,18 @@ REMPLISSAGE_ENTETE = PatternFill("solid", fgColor="2F5496")
 
 MODELES: dict = {
     TypeImport.ENSEIGNANTS: {
-        "colonnes": ["Nom", "Prenom", "Sexe", "Statut", "Taux_Horaire"],
+        "colonnes": ["Nom", "Prenom", "Sexe", "Statut", "Taux_Horaire", "Telephone", "Email", "Adresse"],
         "exemples": [
-            ["Kamgang", "Jean Paul", "M", "P", 2000],
-            ["Ngono", "Marie", "F", "V", 1500],
+            ["Kamgang", "Jean Paul", "M", "P", 2000, "", "", ""],
+            ["Ngono", "Marie", "F", "", "", "", "", ""],
         ],
         "instructions": [
-            "Sexe : M (Masculin) ou F (Féminin).",
-            "Statut : P (Permanent) ou V (Vacataire).",
-            "Taux_Horaire : nombre entier en FCFA, sans décimales.",
+            "Seul le Nom est obligatoire. Une colonne laissée vide (Sexe, Statut, Taux_Horaire) se complète "
+            "plus tard dans Gestion › Enseignants ; la fiche reste alors hors de la paie.",
+            "Sexe : M ou F (Masculin, Féminin, Homme, Femme sont aussi acceptés).",
+            "Statut : P (Permanent) ou V (Vacataire) ; les mots entiers sont aussi acceptés.",
+            "Taux_Horaire : nombre entier en FCFA (« 1500 », « 1 500 » ou « 1500 FCFA »).",
+            "Une liste existante en Word ou en PDF peut aussi être importée directement, sans ce modèle.",
         ],
     },
     TypeImport.HEURES: {

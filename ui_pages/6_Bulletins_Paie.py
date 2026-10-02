@@ -86,7 +86,14 @@ elif periode.statut == StatutPeriode.CLOTUREE:
 # =======================================================================
 st.header("2. Sélection des enseignants")
 
-tous_enseignants = enseignant_service.lister_enseignants(inclure_inactifs=True)
+# Une fiche incomplète n'a pas de paie : elle n'est pas proposée ici.
+tous_enseignants = [e for e in enseignant_service.lister_enseignants(inclure_inactifs=True) if e.est_complet]
+_fiches_a_completer = enseignant_service.lister_enseignants_a_completer()
+if _fiches_a_completer:
+    st.info(
+        f"{len(_fiches_a_completer)} enseignant(s) non proposé(s) ici : fiche à compléter (sexe, statut ou "
+        "taux horaire manquant). Complétez-la dans Gestion › Enseignants pour l'inclure dans la paie."
+    )
 if not tous_enseignants:
     st.info("Aucune donnée disponible. Aucun enseignant n'est enregistré.")
     st.stop()

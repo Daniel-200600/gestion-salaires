@@ -68,6 +68,7 @@ from typing import Dict, List, Optional, Union
 
 from config.settings import TAUX_TAXE
 from database.repositories import enseignant_repository, periode_repository
+from utils.validators import message_fiche_incomplete
 from models.enums import StatutPeriode
 from models.resultat_paie import ResultatPaie
 from services import heures_service, remuneration_service, retenue_service
@@ -148,6 +149,8 @@ def calculer_paie_enseignant(periode_id: int, enseignant_id: int, db_path: DbPat
     enseignant = enseignant_repository.obtenir_par_id(enseignant_id, db_path=db_path)
     if enseignant is None:
         raise CalculPaieError(f"Aucun enseignant avec l'id {enseignant_id}.")
+    if not enseignant.est_complet:
+        raise CalculPaieError(message_fiche_incomplete(enseignant))
 
     heures = heures_service.obtenir_heures_enseignant(periode_id, enseignant_id, db_path=db_path)
     remuneration = remuneration_service.obtenir_remuneration_enseignant(periode_id, enseignant_id, db_path=db_path)

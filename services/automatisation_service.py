@@ -193,7 +193,8 @@ def analyser_generation_bulletins(
     from services import enseignant_service
     from services.paie_service import CalculPaieError, calculer_paie_enseignant
 
-    enseignants = enseignant_service.lister_enseignants(inclure_inactifs=False, db_path=db_path)
+    # Fiches incomplètes exclues : pas de paie, donc pas de bulletin à produire.
+    enseignants = enseignant_service.lister_enseignants_payables(db_path=db_path)
     if enseignant_ids is not None:
         enseignants = [e for e in enseignants if e.id in enseignant_ids]
 
@@ -250,7 +251,8 @@ def generer_bulletins_massif(
     )
     _journaliser_audit(TypeActionAudit.AUTOMATISATION_PREPAREE, operation, db_path=db_path)
 
-    enseignants = enseignant_service.lister_enseignants(inclure_inactifs=False, db_path=db_path)
+    # Fiches incomplètes exclues : pas de paie, donc pas de bulletin à produire.
+    enseignants = enseignant_service.lister_enseignants_payables(db_path=db_path)
     if enseignant_ids is not None:
         enseignants = [e for e in enseignants if e.id in enseignant_ids]
 

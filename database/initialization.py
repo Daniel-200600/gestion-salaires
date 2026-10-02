@@ -45,6 +45,7 @@ def init_database(
     with get_connection(db_path if db_path is not None else DB_PATH) as conn:
         migrations.migrer_audit_log_si_necessaire(conn, schema_sql)
         migrations.ajouter_colonnes_manquantes(conn)
+        migrations.rendre_fiches_enseignants_completables(conn, schema_sql)
         conn.executescript(schema_sql)
         conn.commit()
 

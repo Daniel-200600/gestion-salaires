@@ -72,7 +72,13 @@ st.divider()
 # =======================================================================
 st.header("2. Génération massive des bulletins")
 
-enseignants = enseignant_service.lister_enseignants(inclure_inactifs=False)
+enseignants = enseignant_service.lister_enseignants_payables()
+_fiches_a_completer = enseignant_service.lister_enseignants_a_completer()
+if _fiches_a_completer:
+    st.info(
+        f"{len(_fiches_a_completer)} enseignant(s) non proposé(s) ici : fiche à compléter (sexe, statut ou "
+        "taux horaire manquant). Complétez-la dans Gestion › Enseignants pour l'inclure dans la paie."
+    )
 options_enseignants = {f"{e.nom} {e.prenom}": e.id for e in enseignants}
 choix_enseignants = st.multiselect(
     "Limiter à certains enseignants (optionnel — tous par défaut)", list(options_enseignants.keys())

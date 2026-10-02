@@ -8,6 +8,7 @@ d'utiliser exclusivement 'M'/'F' et 'V'/'P'.
 
 import calendar
 import re
+from typing import Optional
 from datetime import date
 
 from models.enums import Sexe, StatutEnseignant, StatutPeriode
@@ -42,12 +43,16 @@ OPTIONS_SEXE = list(LIBELLES_SEXE.values())
 OPTIONS_STATUT = list(LIBELLES_STATUT.values())
 
 
-def libelle_sexe(sexe: Sexe) -> str:
-    return LIBELLES_SEXE[sexe]
+# Fiche d'enseignant importée incomplète (sexe, statut ou taux absent).
+NON_RENSEIGNE = "Non renseigné"
 
 
-def libelle_statut(statut: StatutEnseignant) -> str:
-    return LIBELLES_STATUT[statut]
+def libelle_sexe(sexe: Optional[Sexe]) -> str:
+    return LIBELLES_SEXE[sexe] if sexe is not None else NON_RENSEIGNE
+
+
+def libelle_statut(statut: Optional[StatutEnseignant]) -> str:
+    return LIBELLES_STATUT[statut] if statut is not None else NON_RENSEIGNE
 
 
 def libelle_actif(actif: bool) -> str:
@@ -86,8 +91,10 @@ def statut_depuis_libelle(libelle: str) -> StatutEnseignant:
     return _STATUT_DEPUIS_LIBELLE[libelle]
 
 
-def formater_fcfa(montant: int) -> str:
+def formater_fcfa(montant: Optional[int]) -> str:
     """Formate un montant entier FCFA avec séparateur de milliers (ex: 150 000 FCFA)."""
+    if montant is None:
+        return NON_RENSEIGNE
     return f"{montant:,.0f} FCFA".replace(",", " ")
 
 

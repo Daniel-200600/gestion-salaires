@@ -39,6 +39,7 @@ class IndicateursEnseignants:
     inactifs: int = 0
     permanents: int = 0
     vacataires: int = 0
+    a_completer: int = 0  # enseignants actifs à fiche incomplète (hors paie)
 
 
 def obtenir_indicateurs_enseignants(db_path: DbPath = None) -> IndicateursEnseignants:
@@ -50,6 +51,7 @@ def obtenir_indicateurs_enseignants(db_path: DbPath = None) -> IndicateursEnseig
         inactifs=sum(1 for e in tous if not e.actif),
         permanents=sum(1 for e in tous if e.statut == StatutEnseignant.PERMANENT),
         vacataires=sum(1 for e in tous if e.statut == StatutEnseignant.VACATAIRE),
+        a_completer=sum(1 for e in tous if e.actif and not e.est_complet),
     )
 
 

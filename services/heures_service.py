@@ -30,7 +30,7 @@ from models.saisie_heures import SaisieHeures
 from utils.validators import (
     valider_heures,
     valider_numero_semaine,
-    verifier_enseignant_actif,
+    verifier_enseignant_payable,
     verifier_periode_ouverte,
 )
 
@@ -79,7 +79,7 @@ def enregistrer_heures_enseignant(
 
     try:
         verifier_periode_ouverte(periode)
-        verifier_enseignant_actif(enseignant)
+        verifier_enseignant_payable(enseignant)
         saisies_validees = [
             SaisieHeures(
                 enseignant_id=enseignant_id,

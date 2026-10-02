@@ -34,7 +34,7 @@ La barre latérale regroupe les pages en sept blocs. Chaque page possède une ad
 | Documents & Opérations | Gestion des documents, Importation, Notifications, Automatisation |
 | Administration & Sécurité | Administration, Guide administrateur (administrateurs uniquement) |
 
-Le **Tableau de bord** affiche le nombre d'enseignants, les indicateurs de paie de la période choisie, les alertes actives et l'évolution de la masse salariale. Lorsqu'aucune donnée n'existe, la mention « Aucune donnée disponible. » s'affiche à la place des indicateurs.
+Le **Tableau de bord** affiche le nombre d'enseignants (dont les fiches à compléter), les indicateurs de paie de la période choisie, les alertes actives et l'évolution de la masse salariale. Lorsqu'aucune donnée n'existe, la mention « Aucune donnée disponible. » s'affiche à la place des indicateurs.
 
 La page **À propos** indique la version installée, les nouveautés de chaque version, la licence et le contact de l'auteur. Indiquez ce numéro de version pour toute demande d'assistance.
 
@@ -43,8 +43,10 @@ La page **À propos** indique la version installée, les nouveautés de chaque v
 Page **Gestion › Enseignants**.
 
 - **Création** : ouvrez **Ajouter un enseignant**, renseignez le nom, le prénom, le sexe, le statut (permanent ou vacataire) et le taux horaire en FCFA, puis cliquez sur **Enregistrer l'enseignant**. Les champs marqués d'un astérisque sont obligatoires.
-- **Recherche et liste** : la liste peut être filtrée par un terme de recherche ; les enseignants désactivés peuvent être affichés ou masqués.
-- **Modification** : sélectionnez l'enseignant dans **Actions sur un enseignant**, onglet **Modifier**. Le taux horaire enregistré sur la fiche est celui utilisé par les calculs ; les bulletins déjà figés d'une période validée ou clôturée conservent les montants de leur génération.
+- **Reprise d'une liste existante** : si vous possédez déjà la liste de vos enseignants (Excel, Word ou PDF), inutile de la ressaisir : importez-la depuis **Documents & Opérations › Importation**, type « Enseignants » (voir section 11). Seul le nom est indispensable ; les informations absentes de la liste se complètent ensuite ici.
+- **Recherche et liste** : la liste peut être filtrée par un terme de recherche ; les enseignants désactivés peuvent être affichés ou masqués. La colonne **Fiche** indique « Complète » ou les informations qui manquent ; la case **Seulement les fiches à compléter** n'affiche que ces dernières.
+- **Fiches à compléter** : une fiche à laquelle il manque le sexe, le statut ou le taux horaire (cas fréquent après l'import d'une liste) est signalée par un message en haut de la page et par la mention « — à compléter » dans la liste de sélection. **Un enseignant dont la fiche est incomplète n'entre pas dans la paie** : il n'est proposé ni pour la saisie des heures, ni pour le calcul, ni pour les bulletins, ni pour l'automatisation, et un message rappelle combien de fiches sont ainsi écartées. Dès que la fiche est complétée, l'enseignant est traité comme les autres.
+- **Modification et complément d'une fiche** : sélectionnez l'enseignant dans **Actions sur un enseignant**, onglet **Modifier**. Pour une fiche à compléter, les champs manquants affichent « À renseigner » : choisissez le sexe et le statut, saisissez le taux horaire, puis cliquez sur **Enregistrer les modifications**. Une information encore inconnue peut rester vide ; la fiche reste alors « à compléter » et vous pourrez y revenir plus tard. Une information déjà renseignée n'est jamais effacée par un champ laissé vide. Le taux horaire enregistré sur la fiche est celui utilisé par les calculs ; les bulletins déjà figés d'une période validée ou clôturée conservent les montants de leur génération.
 - **Changement de statut** : onglet **Changer le statut**. Choisissez le nouveau statut (vacataire ou permanent), cochez la case de confirmation puis cliquez sur **Changer le statut**. Le nouveau statut s'applique aux calculs et aux bulletins produits à partir de ce moment ; un bulletin déjà émis pour une période validée ou clôturée garde le statut qu'il portait. Chaque changement est inscrit au journal d'audit.
 - **Désactivation** : onglet **Activer / Désactiver**. Un enseignant désactivé n'est plus proposé pour la saisie des données de paie ; son historique est conservé et il peut être réactivé.
 - **Suppression définitive** (administrateurs uniquement) : onglet **Supprimer définitivement**. La suppression est refusée si au moins un bulletin existe pour cet enseignant. Sinon, l'application affiche les données liées (heures, primes, retenues) qui seront supprimées avec lui et demande de saisir exactement le nom complet de l'enseignant pour confirmer.
@@ -132,7 +134,15 @@ Page **Documents & Opérations › Gestion des documents**.
 
 Page **Documents & Opérations › Importation** (administrateurs et gestionnaires de paie). La procédure est découpée en huit étapes numérotées.
 
-- **Fichiers acceptés** : Excel (.xlsx) ou CSV (.csv), 10 Mo au maximum. Types d'import : enseignants, heures, rémunérations, retenues. Téléchargez d'abord le modèle Excel ou CSV correspondant au type choisi.
+- **Fichiers acceptés** : Excel (.xlsx) ou CSV (.csv), 10 Mo au maximum, pour les quatre types d'import (enseignants, heures, rémunérations, retenues). Pour les **enseignants**, une liste existante en **Word (.docx)** ou en **PDF** est aussi acceptée. Vous pouvez partir du modèle Excel ou CSV proposé, ou importer directement votre propre liste.
+- **Importer une liste d'enseignants existante** :
+  1. Choisissez le type « Enseignants » et déposez votre fichier. L'application lit les tableaux qu'il contient : feuille Excel, tableaux d'un document Word, tableaux d'un PDF (un tableau qui se poursuit sur plusieurs pages est lu d'un seul tenant). Si le fichier contient plusieurs tableaux, choisissez celui à importer dans **Tableau à importer**.
+  2. Ouvrez **Vérifier l'association des colonnes** : l'application reconnaît d'elle-même les intitulés courants (« Nom », « Prénom(s) », « Noms et prénoms », « Sexe », « Statut », « Taux horaire (FCFA) », « Téléphone », « E-mail », « Adresse »…). Corrigez l'association si une colonne a été mal reconnue, ou choisissez « (ignorer) » pour une colonne inutile. Seule une colonne de nom (ou de nom complet) est exigée.
+  3. Les valeurs sont interprétées avec souplesse : « M », « Masculin », « Homme » ; « P », « Permanent » ; « V », « Vacataire » ; « 1 500 FCFA » pour un taux. Une valeur absente ou illisible n'empêche pas l'import : la ligne devient une **fiche à compléter**, avec un avertissement qui précise l'information manquante.
+  4. La prévisualisation indique le nombre de **Fiches à compléter**. Après l'import, un lien mène directement à la page Enseignants pour les compléter (section 3).
+  5. Si un enseignant existe déjà et que vous choisissez la mise à jour des fiches existantes, seules les informations présentes dans le fichier sont reportées : une case vide du fichier n'efface jamais une information déjà enregistrée.
+- **PDF scannés** : un PDF qui n'est qu'une image (document scanné) ne contient pas de texte lisible ; l'application le signale. Utilisez alors le fichier Word ou Excel d'origine, ou ressaisissez la liste dans le modèle Excel.
+- **Imports d'heures, de rémunérations ou de retenues** : une ligne qui concerne un enseignant dont la fiche est incomplète est rejetée avec un message invitant à compléter la fiche d'abord.
 - **Prévisualisation** : après l'analyse du fichier, chaque ligne est présentée avec l'action prévue (création, mise à jour, ligne ignorée ou rejetée) et ses éventuelles erreurs.
 - **Validation** : **Lancer la simulation** montre le résultat sans rien enregistrer. **Confirmer et importer** enregistre ensuite les données.
 - **Rollback** : l'import est exécuté en une seule opération. Si une erreur survient, rien n'est enregistré et le rapport indique « ÉCHEC (annulé intégralement) ». L'historique des imports reste consultable.
@@ -146,7 +156,7 @@ Page **Documents & Opérations › Automatisation** (administrateurs et gestionn
 
 ## 13. Notifications
 
-Page **Documents & Opérations › Notifications**. Les alertes signalent un point à traiter : anomalie de paie, document manquant ou modifié, sauvegarde absente ou ancienne, problème d'import. Chaque alerte indique son niveau en toutes lettres (Critique, Erreur, Avertissement, Info).
+Page **Documents & Opérations › Notifications**. Les alertes signalent un point à traiter : anomalie de paie, document manquant ou modifié, sauvegarde absente ou ancienne, problème d'import, fiches d'enseignants à compléter (une seule alerte indique leur nombre ; elle se résout d'elle-même une fois toutes les fiches complétées). Chaque alerte indique son niveau en toutes lettres (Critique, Erreur, Avertissement, Info).
 
 - **Consultation** : **Analyser maintenant** relance les détections. Filtrez par niveau, statut, période, enseignant ou texte recherché ; exportez la liste filtrée au format Excel.
 - **Acquittement** : **Marquer lue** puis **Acquitter** indiquent que l'alerte a été prise en compte.

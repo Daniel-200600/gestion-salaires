@@ -17,7 +17,7 @@ from database.repositories import enseignant_repository, periode_repository, rem
 from models.element_remuneration import ElementRemuneration
 from models.enums import TypeElementRemuneration
 from services.heures_service import DonneesPaieValidationError
-from utils.validators import valider_montant_fcfa, verifier_enseignant_actif, verifier_periode_ouverte
+from utils.validators import valider_montant_fcfa, verifier_enseignant_payable, verifier_periode_ouverte
 
 DbPath = Optional[Union[str, Path]]
 
@@ -68,7 +68,7 @@ def enregistrer_remuneration_enseignant(
 
     try:
         verifier_periode_ouverte(periode)
-        verifier_enseignant_actif(enseignant)
+        verifier_enseignant_payable(enseignant)
         montants_valides = {
             type_element: valider_montant_fcfa(valeur, _LIBELLES_CHAMP[type_element])
             for type_element, valeur in valeurs_brutes.items()

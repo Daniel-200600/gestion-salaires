@@ -25,7 +25,7 @@ from database.initialization import init_database
 from database.repositories import import_repository
 from exports.import_template_export import generer_classeur_modele, generer_modele_csv
 from models.enums import StrategieDoublon, TypeImport
-from services import import_service, periode_service, permission_service
+from services import enseignant_service, import_service, periode_service, permission_service
 from services.import_service import ImportServiceError
 from utils.formatters import libelle_statut_periode
 from utils.session_auth import exiger_permission
@@ -93,7 +93,17 @@ st.divider()
 # Section 3 — Importer un fichier
 # =======================================================================
 st.header("3. Choisir un fichier")
-fichier_televerse = st.file_uploader("Fichier Excel (.xlsx) ou CSV (.csv)", type=["xlsx", "csv"])
+if type_import == TypeImport.ENSEIGNANTS:
+    st.info(
+        "Vous pouvez importer votre liste d'enseignants existante telle quelle, en Excel, Word ou PDF : "
+        "l'application lit le tableau qu'elle contient et reconnaît les intitulés usuels (Nom, Prénoms, "
+        "« Nom et prénoms » dans une seule colonne, Sexe ou Genre, Statut, Taux horaire, Téléphone…). "
+        "Seul le nom est obligatoire : une information absente (sexe, statut, taux horaire) se complète "
+        "plus tard dans Gestion › Enseignants. Une fiche incomplète n'entre pas dans la paie."
+    )
+fichier_televerse = st.file_uploader(
+    "Fichier Excel (.xlsx), CSV (.csv), Word (.docx) ou PDF (.pdf)", type=["xlsx", "csv", "docx", "pdf"]
+)
 
 cle_etat = f"import_pipeline_{type_import.value}"
 if fichier_televerse is None:
@@ -116,11 +126,14 @@ except ImportServiceError as erreur:
     st.error(str(erreur))
     st.stop()
 
-st.success(f"Fichier lu : {contenu.nom_fichier} — {len(contenu.noms_feuilles)} feuille(s).")
+unite = "tableau(x)" if suffixe in (".docx", ".pdf") else "feuille(s)"
+st.success(f"Fichier lu : {contenu.nom_fichier} — {len(contenu.noms_feuilles)} {unite}.")
 
 feuille_choisie = contenu.noms_feuilles[0]
 if len(contenu.noms_feuilles) > 1:
-    feuille_choisie = st.selectbox("Feuille à importer", contenu.noms_feuilles)
+    feuille_choisie = st.selectbox(
+        "Tableau à importer" if suffixe in (".docx", ".pdf") else "Feuille à importer", contenu.noms_feuilles
+    )
 
 st.divider()
 
@@ -138,6 +151,37 @@ col1, col2, col3 = st.columns(3)
 col1.metric("Lignes détectées", analyse.nombre_lignes)
 col2.metric("Colonnes reconnues", len(analyse.colonnes_reconnues))
 col3.metric("Colonnes non reconnues", len(analyse.colonnes_inconnues))
+
+CHAMPS_ENSEIGNANT = {
+    "nom": "Nom", "prenom": "Prénom(s)", "nom_complet": "Nom et prénoms (une seule colonne)",
+    "sexe": "Sexe", "statut": "Statut (vacataire / permanent)", "taux_horaire": "Taux horaire",
+    "telephone": "Téléphone", "email": "Adresse électronique", "adresse": "Adresse",
+}
+if type_import == TypeImport.ENSEIGNANTS:
+    # L'administrateur vérifie, et corrige si besoin, la colonne associée à
+    # chaque information (intitulés propres à chaque établissement).
+    with st.expander("Vérifier l'association des colonnes", expanded=bool(analyse.colonnes_inconnues)):
+        aucune = "— aucune —"
+        colonne_de = {champ: colonne for colonne, champ in analyse.colonnes_reconnues.items()}
+        correspondance = {}
+        colonnes_cote = st.columns(3)
+        for position, (champ, libelle) in enumerate(CHAMPS_ENSEIGNANT.items()):
+            options = [aucune] + analyse.colonnes_detectees
+            choix = colonnes_cote[position % 3].selectbox(
+                libelle, options, index=options.index(colonne_de[champ]) if champ in colonne_de else 0,
+                key=f"{cle_etat}_colonne_{champ}",
+            )
+            if choix != aucune:
+                correspondance[choix] = champ
+        analyse.colonnes_reconnues = correspondance
+        analyse.colonnes_inconnues = [c for c in analyse.colonnes_detectees if c not in correspondance]
+    if not set(analyse.colonnes_reconnues.values()) & {"nom", "nom_complet"}:
+        st.error("Associez une colonne au nom (ou au « Nom et prénoms ») pour continuer.")
+        st.stop()
+    signature = tuple(sorted(analyse.colonnes_reconnues.items()))
+    if st.session_state.get(f"{cle_etat}_signature_colonnes") != signature:
+        st.session_state.pop(f"{cle_etat}_rapport_prep", None)
+        st.session_state[f"{cle_etat}_signature_colonnes"] = signature
 
 if analyse.colonnes_inconnues:
     st.warning("Colonnes non reconnues (ignorées) : " + ", ".join(analyse.colonnes_inconnues))
@@ -195,12 +239,19 @@ if st.button("Lancer la simulation", type="primary"):
 
 rapport_prep = st.session_state.get(f"{cle_etat}_rapport_prep")
 if rapport_prep is not None:
-    colA, colB, colC, colD, colE = st.columns(5)
+    colA, colB, colC, colD, colE, colF = st.columns(6)
     colA.metric("Créations", rapport_prep.nb_creations)
     colB.metric("Mises à jour", rapport_prep.nb_mises_a_jour)
     colC.metric("Ignorées", rapport_prep.nb_ignorees)
     colD.metric("Rejetées", rapport_prep.nb_rejetees)
     colE.metric("Erreurs", rapport_prep.nb_erreurs)
+    colF.metric("Fiches à compléter", rapport_prep.nb_fiches_incompletes)
+    if rapport_prep.nb_fiches_incompletes:
+        st.info(
+            f"{rapport_prep.nb_fiches_incompletes} enseignant(s) seront enregistrés avec une fiche à compléter "
+            "(sexe, statut ou taux horaire absent). Ils n'entreront dans la paie qu'une fois leur fiche "
+            "complétée dans Gestion › Enseignants."
+        )
 
     if rapport_prep.toutes_anomalies:
         lignes_anomalies = [
@@ -228,7 +279,8 @@ if rapport_prep is not None:
             f"- Créations : **{rapport_prep.nb_creations}**\n"
             f"- Mises à jour : **{rapport_prep.nb_mises_a_jour}**\n"
             f"- Ignorées : **{rapport_prep.nb_ignorees}**\n"
-            f"- Rejetées : **{rapport_prep.nb_rejetees}**\n\n"
+            f"- Rejetées : **{rapport_prep.nb_rejetees}**\n"
+            f"- Fiches à compléter ensuite : **{rapport_prep.nb_fiches_incompletes}**\n\n"
             f"**Cette opération modifiera la base de données.**"
         )
         confirmation = st.checkbox("Je confirme cette importation.")
@@ -286,6 +338,16 @@ if dernier_journal_id:
         """)
 else:
     st.info("Aucun import récent à afficher pour cette session.")
+
+if type_import == TypeImport.ENSEIGNANTS:
+    a_completer = enseignant_service.lister_enseignants_a_completer()
+    if a_completer:
+        st.warning(
+            f"{len(a_completer)} fiche(s) d'enseignant à compléter (sexe, statut ou taux horaire manquant). "
+            "Ces enseignants n'entrent pas dans la paie tant que leur fiche est incomplète."
+        )
+        st.page_link("ui_pages/1_Enseignants.py", label="Compléter les fiches dans Gestion › Enseignants",
+                     icon=":material/edit_note:")
 
 with st.expander("Historique des imports"):
     imports_recents = import_repository.lister_imports(type_import=type_import)[:20]

@@ -41,12 +41,16 @@ PRAGMA foreign_keys = ON;
 CREATE TABLE IF NOT EXISTS enseignants (
     id                  INTEGER PRIMARY KEY AUTOINCREMENT,
     nom                 TEXT    NOT NULL,
-    prenom              TEXT    NOT NULL,
-    sexe                TEXT    NOT NULL CHECK (sexe IN ('M', 'F')),
-    statut              TEXT    NOT NULL CHECK (statut IN ('V', 'P')),
-    taux_horaire        INTEGER NOT NULL
-                            CHECK (taux_horaire >= 0)
-                            CHECK (taux_horaire = CAST(taux_horaire AS INTEGER)),
+    prenom              TEXT    NOT NULL DEFAULT '',
+    -- Sexe, statut et taux horaire peuvent rester vides : fiche importée
+    -- depuis une liste existante, à compléter plus tard (page Enseignants).
+    -- Une fiche sans statut ou sans taux horaire n'entre dans aucun calcul
+    -- de paie (voir Enseignant.est_complet).
+    sexe                TEXT    NULL CHECK (sexe IS NULL OR sexe IN ('M', 'F')),
+    statut              TEXT    NULL CHECK (statut IS NULL OR statut IN ('V', 'P')),
+    taux_horaire        INTEGER NULL
+                            CHECK (taux_horaire IS NULL OR taux_horaire >= 0)
+                            CHECK (taux_horaire IS NULL OR taux_horaire = CAST(taux_horaire AS INTEGER)),
     email               TEXT    NULL,
     telephone           TEXT    NULL,
     adresse             TEXT    NULL,

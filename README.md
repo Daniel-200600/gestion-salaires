@@ -1,4 +1,4 @@
-# Gestion des Salaires — v1.2.0
+# Gestion des Salaires — v1.3.0
 
 [![tests](https://github.com/Daniel-200600/gestion-salaires/actions/workflows/tests.yml/badge.svg)](https://github.com/Daniel-200600/gestion-salaires/actions/workflows/tests.yml)
 ![Python](https://img.shields.io/badge/python-3.11-blue)
@@ -20,6 +20,7 @@ Couvre l'intégralité du cycle de paie : gestion des enseignants et des périod
 - Modèles de bulletin importables (Word ou PDF, bulletin rempli ou modèle à balises)
 - Taux de taxe paramétrable (5 % par défaut, figé par période à la validation)
 - Changement de statut d'un enseignant (vacataire / permanent), journalisé
+- Reprise d'une liste d'enseignants existante (Excel, CSV, Word ou PDF) ; les informations manquantes se complètent plus tard, les fiches incomplètes restant hors de la paie
 - Exports comptables (Excel)
 - Historique et reporting multi-périodes
 - Gestion documentaire (registre, intégrité, archivage sécurisé)
@@ -81,7 +82,7 @@ Sauvegarde via l'API native SQLite (`sqlite3.Connection.backup()`), jamais une s
 
 ## Version
 
-**1.2.0** — voir `config/settings.py` (`VERSION`), source unique du numéro de version.
+**1.3.0** — voir `config/settings.py` (`VERSION`), source unique du numéro de version.
 
 ## Tests
 
@@ -89,7 +90,7 @@ Sauvegarde via l'API native SQLite (`sqlite3.Connection.backup()`), jamais une s
 python -m pytest -q
 ```
 
-Résultat de référence : **1537 passed, 3 skipped** (version 1.2.0 ; voir `docs/bulletins_taxe_statut.md`).
+Résultat de référence : **1553 passed, 3 skipped** (version 1.3.0 ; voir `docs/bulletins_taxe_statut.md`).
 
 ## Licence
 

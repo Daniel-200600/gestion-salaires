@@ -68,12 +68,19 @@ st.header("Enseignants")
 if indicateurs.total == 0:
     st.info("Aucune donnée disponible. Aucun enseignant n'est enregistré.")
 else:
-    col1, col2, col3, col4, col5 = st.columns(5)
+    col1, col2, col3, col4, col5, col6 = st.columns(6)
     col1.metric("Total", indicateurs.total)
     col2.metric("Actifs", indicateurs.actifs)
     col3.metric("Inactifs", indicateurs.inactifs)
     col4.metric("Permanents", indicateurs.permanents)
     col5.metric("Vacataires", indicateurs.vacataires)
+    col6.metric("Fiches à compléter", indicateurs.a_completer)
+    if indicateurs.a_completer:
+        st.warning(
+            f"{indicateurs.a_completer} enseignant(s) actif(s) ont une fiche incomplète (sexe, statut ou taux "
+            "horaire manquant) et n'entrent pas dans la paie tant qu'elle n'est pas complétée."
+        )
+        st.page_link("ui_pages/1_Enseignants.py", label="Compléter les fiches", icon=":material/edit_note:")
 
 st.divider()
 

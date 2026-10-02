@@ -20,9 +20,11 @@ indépendamment.
 """
 
 import logging
+import re
+import unicodedata
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Dict, List, Optional, Union
+from typing import Dict, List, Optional, Tuple, Union
 
 import pandas as pd
 
@@ -47,6 +49,9 @@ from models.import_journal import AnomalieImport, ImportJournal
 from models.saisie_heures import SaisieHeures
 from utils.validators import (
     EnseignantValidationError,
+    message_fiche_incomplete,
+    nettoyer_champ_optionnel,
+    nettoyer_texte,
     valider_heures,
     valider_nom_ou_prenom,
     valider_sexe,
@@ -58,7 +63,8 @@ DbPath = Optional[Union[str, Path]]
 
 logger = logging.getLogger("salaires_app.import_service")
 
-EXTENSIONS_AUTORISEES = {".xlsx", ".csv"}
+EXTENSIONS_AUTORISEES = {".xlsx", ".csv", ".docx", ".pdf"}
+FORMATS_ACCEPTES = "Excel (.xlsx), CSV (.csv), Word (.docx) ou PDF (.pdf)"
 TAILLE_MAX_OCTETS = 10 * 1024 * 1024  # 10 Mo — documenté (section 5)
 
 
@@ -84,8 +90,9 @@ class ContenuFichier:
 
 def lire_fichier(chemin: Path, nom_fichier: Optional[str] = None) -> ContenuFichier:
     """
-    Lit un fichier .xlsx (toutes feuilles) ou .csv (une seule
-    « feuille » nommée `csv`). Contrôle systématiquement : extension,
+    Lit un fichier .xlsx (toutes feuilles), .csv (une seule « feuille »
+    nommée `csv`), .docx (chaque tableau du document) ou .pdf (chaque
+    tableau, y compris une liste qui se poursuit sur plusieurs pages). Contrôle systématiquement : extension,
     existence, taille, lisibilité, présence de données (section 5).
 
     Ne fait jamais confiance au nom de fichier fourni par
@@ -99,7 +106,7 @@ def lire_fichier(chemin: Path, nom_fichier: Optional[str] = None) -> ContenuFich
 
     if extension not in EXTENSIONS_AUTORISEES:
         raise ImportServiceError(
-            f"Extension non autorisée : « {extension} ». Formats acceptés : .xlsx, .csv."
+            f"Extension non autorisée : « {extension} ». Formats acceptés : {FORMATS_ACCEPTES}."
         )
     if not chemin.exists():
         raise ImportServiceError("Le fichier est introuvable.")
@@ -124,6 +131,10 @@ def lire_fichier(chemin: Path, nom_fichier: Optional[str] = None) -> ContenuFich
                 raise ImportServiceError(
                     "Aucune donnée exploitable dans le classeur (toutes les feuilles sont vides)."
                 )
+        elif extension == ".docx":
+            feuilles = _lire_tableaux_word(chemin)
+        elif extension == ".pdf":
+            feuilles = _lire_tableaux_pdf(chemin)
         else:  # .csv
             df = pd.read_csv(chemin, dtype=str)
             if df.empty:
@@ -141,19 +152,117 @@ def lire_fichier(chemin: Path, nom_fichier: Optional[str] = None) -> ContenuFich
 
 
 # ---------------------------------------------------------------------
+# Lecture des listes Word et PDF : chaque tableau devient une « feuille »
+# ---------------------------------------------------------------------
+
+def _tableau_vers_dataframe(lignes: List[List[Optional[str]]]) -> pd.DataFrame:
+    """
+    Première ligne non vide = en-têtes ; lignes entièrement vides ignorées.
+    Un en-tête vide ou répété reçoit un nom distinct (« Colonne 3 »...).
+    """
+    lignes = [[nettoyer_texte(str(c)) if c is not None else "" for c in ligne] for ligne in lignes]
+    lignes = [ligne for ligne in lignes if any(ligne)]
+    if len(lignes) < 2:
+        return pd.DataFrame()
+    largeur = max(len(ligne) for ligne in lignes)
+    lignes = [ligne + [""] * (largeur - len(ligne)) for ligne in lignes]
+    en_tetes, vus = [], set()
+    for position, en_tete in enumerate(lignes[0], start=1):
+        nom = en_tete or f"Colonne {position}"
+        while nom in vus:
+            nom = f"{nom} ({position})"
+        vus.add(nom)
+        en_tetes.append(nom)
+    return pd.DataFrame(lignes[1:], columns=en_tetes, dtype=str).replace("", None)
+
+
+def _lire_tableaux_word(chemin: Path) -> Dict[str, pd.DataFrame]:
+    from docx import Document
+
+    try:
+        document = Document(str(chemin))
+    except Exception as erreur:  # noqa: BLE001
+        raise ImportServiceError("Le document Word n'a pas pu être ouvert (fichier endommagé ?).") from erreur
+    feuilles = {}
+    for numero, tableau in enumerate(document.tables, start=1):
+        df = _tableau_vers_dataframe([[cellule.text for cellule in ligne.cells] for ligne in tableau.rows])
+        if not df.empty:
+            feuilles[f"Tableau {numero}"] = df
+    if not feuilles:
+        raise ImportServiceError(
+            "Aucun tableau exploitable dans le document Word : présentez la liste sous forme de tableau "
+            "(une ligne par enseignant, les intitulés des colonnes sur la première ligne)."
+        )
+    return feuilles
+
+
+def _ressemble_a_un_en_tete(ligne: List[Optional[str]]) -> bool:
+    champs = {_cle_normalisation(v) for variantes in VARIANTES_COLONNES.values() for vs in variantes.values() for v in vs}
+    return any(_cle_normalisation(c or "") in champs for c in ligne)
+
+
+def _lire_tableaux_pdf(chemin: Path) -> Dict[str, pd.DataFrame]:
+    import pymupdf
+
+    try:
+        document = pymupdf.open(str(chemin))
+    except Exception as erreur:  # noqa: BLE001
+        raise ImportServiceError("Le PDF n'a pas pu être ouvert (fichier endommagé ou protégé ?).") from erreur
+    if not any(page.get_text().strip() for page in document):
+        raise ImportServiceError(
+            "Ce PDF ne contient pas de texte (document scanné ou photographié) : il ne peut pas être lu. "
+            "Utilisez le fichier Word ou Excel d'origine."
+        )
+    tableaux: List[List[List[Optional[str]]]] = []
+    for page in document:
+        for tableau in page.find_tables().tables:
+            lignes = tableau.extract()
+            if not lignes:
+                continue
+            precedent = tableaux[-1] if tableaux else None
+            # Une liste longue continue sur la page suivante : même nombre de
+            # colonnes, sans en-tête (ou avec le même en-tête répété).
+            if precedent is not None and len(lignes[0]) == len(precedent[0]) and (
+                lignes[0] == precedent[0] or not _ressemble_a_un_en_tete(lignes[0])
+            ):
+                precedent.extend(lignes[1:] if lignes[0] == precedent[0] else lignes)
+            else:
+                tableaux.append([list(ligne) for ligne in lignes])
+    feuilles = {}
+    for numero, lignes in enumerate(tableaux, start=1):
+        df = _tableau_vers_dataframe(lignes)
+        if not df.empty:
+            feuilles[f"Tableau {numero}"] = df
+    if not feuilles:
+        raise ImportServiceError(
+            "Aucun tableau reconnu dans le PDF : la liste doit être présentée sous forme de tableau "
+            "(une ligne par enseignant)."
+        )
+    return feuilles
+
+
+# ---------------------------------------------------------------------
 # Normalisation des colonnes (section 7)
 # ---------------------------------------------------------------------
 
 VARIANTES_COLONNES: Dict[TypeImport, Dict[str, List[str]]] = {
     TypeImport.ENSEIGNANTS: {
-        "nom": ["nom", "nom enseignant", "nom_enseignant"],
-        "prenom": ["prenom", "prénom", "prenom enseignant", "prenom_enseignant"],
-        "sexe": ["sexe"],
-        "statut": ["statut", "statut enseignant"],
-        "taux_horaire": ["taux_horaire", "taux horaire", "taux"],
-        "email": ["email", "e-mail", "courriel"],
-        "telephone": ["telephone", "téléphone", "tel"],
-        "adresse": ["adresse"],
+        "nom": ["nom", "noms", "nom enseignant", "nom_enseignant", "nom de famille", "last name"],
+        "prenom": ["prenom", "prénom", "prenoms", "prénoms", "prenom s", "prenom enseignant", "prenom_enseignant",
+                   "first name"],
+        # Une seule colonne pour le nom et le(s) prénom(s) : séparée à l'import.
+        "nom_complet": ["nom et prenom", "nom et prenoms", "noms et prenoms", "nom prenom", "nom prenoms",
+                        "noms prenoms", "nom complet", "nom et prenom s", "noms et prenom s", "enseignant",
+                        "enseignants", "identite", "nom de l enseignant", "nom et prenoms de l enseignant"],
+        "sexe": ["sexe", "genre", "sexe m f", "m f", "h f"],
+        "statut": ["statut", "statut enseignant", "statut v p", "v p", "categorie", "type", "situation",
+                   "vacataire permanent", "type de contrat", "contrat"],
+        "taux_horaire": ["taux_horaire", "taux horaire", "taux", "taux horaire fcfa", "taux fcfa", "taux heure",
+                         "taux par heure", "taux h", "prix de l heure", "prix horaire", "montant horaire"],
+        "email": ["email", "e-mail", "courriel", "mail", "adresse email", "adresse e-mail", "adresse mail"],
+        "telephone": ["telephone", "téléphone", "tel", "tél", "contact", "contacts", "numero", "numero de telephone",
+                      "n telephone", "n tel", "portable", "mobile", "cellulaire"],
+        "adresse": ["adresse", "domicile", "lieu de residence", "residence", "quartier", "ville"],
     },
     TypeImport.HEURES: {
         "nom": ["nom", "nom enseignant", "nom_enseignant"],
@@ -181,7 +290,14 @@ VARIANTES_COLONNES: Dict[TypeImport, Dict[str, List[str]]] = {
 
 
 def _cle_normalisation(valeur: str) -> str:
-    return " ".join(str(valeur).strip().lower().replace("_", " ").split())
+    """
+    Forme de comparaison d'un intitulé ou d'un nom : sans accents, en
+    minuscules, ponctuation remplacée par des espaces (« Prénom(s) » ->
+    « prenom s », « Taux/heure » -> « taux heure »).
+    """
+    texte = unicodedata.normalize("NFKD", str(valeur))
+    texte = "".join(c for c in texte if not unicodedata.combining(c)).lower()
+    return " ".join(re.sub(r"[^0-9a-z]+", " ", texte).split())
 
 
 @dataclass
@@ -207,12 +323,71 @@ def normaliser_colonnes(colonnes_brutes: List[str], type_import: TypeImport) -> 
     colonnes_inconnues: List[str] = []
     for colonne in colonnes_brutes:
         cle = _cle_normalisation(colonne)
+        # « Taux horaire (FCFA) », « Taux/heure en F CFA » : la devise en fin
+        # d'intitulé ne change pas la nature de la colonne.
+        sans_devise = re.sub(r"( en)?( f cfa| fcfa| xaf| cfa| f)+$", "", cle)
         if cle in lookup:
             correspondance[colonne] = lookup[cle]
+        elif sans_devise in lookup:
+            correspondance[colonne] = lookup[sans_devise]
         else:
             colonnes_inconnues.append(colonne)
 
     return ResultatNormalisation(correspondance=correspondance, colonnes_inconnues=colonnes_inconnues)
+
+
+# ---------------------------------------------------------------------
+# Interprétation souple des valeurs d'une liste existante (import enseignants)
+# ---------------------------------------------------------------------
+
+_SEXES = {"m": "M", "masculin": "M", "homme": "M", "h": "M", "garcon": "M", "male": "M",
+          "f": "F", "feminin": "F", "femme": "F", "fille": "F", "female": "F"}
+_STATUTS = {"v": "V", "vacataire": "V", "vac": "V", "vacation": "V",
+            "p": "P", "permanent": "P", "perm": "P", "titulaire": "P", "permanente": "P"}
+
+
+def interpreter_sexe(valeur: Optional[str]):
+    """« Masculin », « H », « F », « Femme »... -> Sexe, ou None si non reconnu."""
+    code = _SEXES.get(_cle_normalisation(valeur or ""))
+    return valider_sexe(code) if code else None
+
+
+def interpreter_statut(valeur: Optional[str]):
+    """« Vacataire », « V », « Permanent »... -> StatutEnseignant, ou None si non reconnu."""
+    code = _STATUTS.get(_cle_normalisation(valeur or ""))
+    return valider_statut(code) if code else None
+
+
+def interpreter_taux_horaire(valeur: Optional[str]) -> Optional[int]:
+    """« 1 500 », « 1500 FCFA », « 1.500 », « 1500,00 » -> 1500 ; None si non reconnu."""
+    if valeur is None:
+        return None
+    texte = re.sub(r"(?i)\s*(f\s*cfa|xaf|fcfa|francs?|f)\s*$", "", str(valeur).strip())
+    texte = re.sub(r"[\s\u00a0\u202f]", "", texte)
+    if re.fullmatch(r"\d{1,3}(\.\d{3})+", texte):
+        texte = texte.replace(".", "")
+    texte = re.sub(r"[,.]0+$", "", texte)
+    try:
+        return valider_taux_horaire(texte)
+    except EnseignantValidationError:
+        return None
+
+
+def separer_nom_complet(valeur: str) -> Tuple[str, str]:
+    """
+    « MBARGA Élise » -> ("MBARGA", "Élise") ; « MBALLA NDOME Clarisse » ->
+    ("MBALLA NDOME", "Clarisse"). Les mots en majuscules du début forment le
+    nom ; à défaut (tout en majuscules, ou aucune majuscule), le premier mot.
+    """
+    mots = nettoyer_texte(valeur).split()
+    if not mots:
+        return "", ""
+    debut = 0
+    while debut < len(mots) and mots[debut].isupper():
+        debut += 1
+    if 0 < debut < len(mots):
+        return " ".join(mots[:debut]), " ".join(mots[debut:])
+    return mots[0], " ".join(mots[1:])
 
 
 # ---------------------------------------------------------------------
@@ -342,6 +517,14 @@ class RapportPreparation:
         return sum(1 for l in self.lignes for a in l.anomalies if a.niveau == NiveauAnomalie.AVERTISSEMENT)
 
     @property
+    def nb_fiches_incompletes(self) -> int:
+        """Enseignants créés ou mis à jour dont la fiche restera à compléter."""
+        return sum(
+            1 for l in self.lignes
+            if l.action in (ActionLigne.CREATION, ActionLigne.MISE_A_JOUR) and l.donnees.get("a_completer")
+        )
+
+    @property
     def toutes_anomalies(self) -> List[AnomalieImport]:
         return [a for l in self.lignes for a in l.anomalies]
 
@@ -357,68 +540,60 @@ def preparer_import_enseignants(
     db_path: DbPath = None,
 ) -> RapportPreparation:
     """
-    Valide (technique + métier) chaque ligne et détecte les doublons
-    (internes au fichier et contre la base) — SANS jamais écrire en
-    base (section 13/14). Une seule requête pour tous les enseignants
-    existants (section 26 : jamais une requête par ligne).
+    Valide chaque ligne et détecte les doublons (internes au fichier et
+    contre la base) — SANS jamais écrire en base (section 13/14). Une seule
+    requête pour tous les enseignants existants (section 26).
+
+    Seul le nom est obligatoire. Un sexe, un statut ou un taux horaire
+    absent ou illisible n'écarte pas la ligne : l'enseignant est créé avec
+    une fiche « à compléter » (avertissement), exclue de la paie jusqu'à ce
+    qu'elle soit complétée dans Gestion › Enseignants. Avec la stratégie
+    METTRE_A_JOUR, seules les informations présentes dans le fichier sont
+    reprises : une valeur déjà connue n'est jamais effacée.
     """
     enseignants_existants = enseignant_repository.lister(inclure_inactifs=True, db_path=db_path)
     index_existants = {
         (_cle_normalisation(e.nom), _cle_normalisation(e.prenom)): e for e in enseignants_existants
     }
+    colonnes = analyse.colonnes_reconnues
 
     rapport = RapportPreparation()
     cles_vues_dans_fichier: Dict[tuple, int] = {}
 
     for position, row in enumerate(df.to_dict(orient="records"), start=1):
         ligne = LigneImport(numero_ligne=position, donnees=row)
+        valeur = lambda champ: _valeur_normalisee(row, colonnes, champ)  # noqa: E731
 
-        nom_brut = _valeur_normalisee(row, analyse.colonnes_reconnues, "nom")
-        prenom_brut = _valeur_normalisee(row, analyse.colonnes_reconnues, "prenom")
-        sexe_brut = _valeur_normalisee(row, analyse.colonnes_reconnues, "sexe")
-        statut_brut = _valeur_normalisee(row, analyse.colonnes_reconnues, "statut")
-        taux_brut = _valeur_normalisee(row, analyse.colonnes_reconnues, "taux_horaire")
+        nom_brut, prenom_brut = valeur("nom"), valeur("prenom")
+        if nom_brut is None and valeur("nom_complet") is not None:
+            nom_brut, prenom_separe = separer_nom_complet(valeur("nom_complet"))
+            prenom_brut = prenom_brut or prenom_separe
+        nom = nettoyer_texte(nom_brut)
+        prenom = nettoyer_texte(prenom_brut)
+        if not nom:
+            if any(v is not None for v in row.values() if not (isinstance(v, float) and pd.isna(v))):
+                _ajouter_erreur(ligne, "nom", nom_brut, "Nom absent : la ligne ne peut pas être importée.")
+                rapport.lignes.append(ligne)
+            continue
 
-        try:
-            nom = valider_nom_ou_prenom(nom_brut, "nom")
-        except EnseignantValidationError as erreur:
-            _ajouter_erreur(ligne, "nom", nom_brut, str(erreur))
-            rapport.lignes.append(ligne)
-            continue
-        try:
-            prenom = valider_nom_ou_prenom(prenom_brut, "prenom")
-        except EnseignantValidationError as erreur:
-            _ajouter_erreur(ligne, "prenom", prenom_brut, str(erreur))
-            rapport.lignes.append(ligne)
-            continue
-        try:
-            if sexe_brut is None:
-                raise EnseignantValidationError("Le sexe est obligatoire.")
-            sexe = valider_sexe(sexe_brut)
-        except EnseignantValidationError as erreur:
-            _ajouter_erreur(ligne, "sexe", sexe_brut, str(erreur))
-            rapport.lignes.append(ligne)
-            continue
-        try:
-            if statut_brut is None:
-                raise EnseignantValidationError("Le statut est obligatoire.")
-            statut = valider_statut(statut_brut)
-        except EnseignantValidationError as erreur:
-            _ajouter_erreur(ligne, "statut", statut_brut, str(erreur))
-            rapport.lignes.append(ligne)
-            continue
-        try:
-            taux_horaire = valider_taux_horaire(taux_brut)
-        except EnseignantValidationError as erreur:
-            _ajouter_erreur(ligne, "taux_horaire", taux_brut, str(erreur))
-            rapport.lignes.append(ligne)
-            continue
+        donnees = {"nom": nom, "prenom": prenom}
+        for champ, interpreter, libelle in (
+            ("sexe", interpreter_sexe, "sexe"),
+            ("statut", interpreter_statut, "statut"),
+            ("taux_horaire", interpreter_taux_horaire, "taux horaire"),
+        ):
+            brut = valeur(champ)
+            donnees[champ] = interpreter(brut)
+            if brut is not None and donnees[champ] is None:
+                _ajouter_avertissement(ligne, champ, brut, f"{libelle.capitalize()} « {brut} » non reconnu : à compléter.")
+        for champ in ("email", "telephone", "adresse"):
+            donnees[champ] = nettoyer_champ_optionnel(valeur(champ))
 
         cle = (_cle_normalisation(nom), _cle_normalisation(prenom))
-
+        nom_affiche = f"{nom} {prenom}".strip()
         if cle in cles_vues_dans_fichier:
             _ajouter_avertissement(
-                ligne, "nom", f"{nom} {prenom}",
+                ligne, "nom", nom_affiche,
                 f"Doublon interne au fichier (déjà présent à la ligne {cles_vues_dans_fichier[cle]}).",
             )
             ligne.action = ActionLigne.IGNOREE
@@ -428,37 +603,43 @@ def preparer_import_enseignants(
 
         existant = index_existants.get(cle)
         if existant is not None:
-            conflit = existant.taux_horaire != taux_horaire or existant.statut != statut or existant.sexe != sexe
             if strategie_doublon == StrategieDoublon.REFUSER:
                 _ajouter_erreur(
-                    ligne, "nom", f"{nom} {prenom}",
-                    f"« {nom} {prenom} » existe déjà en base (id {existant.id}) — stratégie REFUSER.",
+                    ligne, "nom", nom_affiche,
+                    f"« {nom_affiche} » existe déjà en base (id {existant.id}) — stratégie REFUSER.",
                 )
                 rapport.lignes.append(ligne)
                 continue
-            elif strategie_doublon == StrategieDoublon.IGNORER:
-                _ajouter_avertissement(
-                    ligne, "nom", f"{nom} {prenom}", "Enseignant déjà existant — ignoré (stratégie IGNORER)."
-                )
+            if strategie_doublon == StrategieDoublon.IGNORER:
+                _ajouter_avertissement(ligne, "nom", nom_affiche, "Enseignant déjà existant — ignoré (stratégie IGNORER).")
                 ligne.action = ActionLigne.IGNOREE
                 rapport.lignes.append(ligne)
                 continue
-            else:  # METTRE_A_JOUR
-                if conflit:
-                    _ajouter_avertissement(
-                        ligne, "nom", f"{nom} {prenom}",
-                        "Valeurs différentes de la base (taux/statut/sexe) — seront mises à jour.",
-                    )
-                ligne.action = ActionLigne.MISE_A_JOUR
-                ligne.cible_id = existant.id
-                ligne.donnees = {
-                    "nom": nom, "prenom": prenom, "sexe": sexe, "statut": statut, "taux_horaire": taux_horaire,
-                }
-                rapport.lignes.append(ligne)
-                continue
+            # METTRE_A_JOUR : complète sans jamais effacer une valeur connue.
+            conflits = [champ for champ in ("sexe", "statut", "taux_horaire")
+                        if donnees[champ] is not None and getattr(existant, champ) not in (None, donnees[champ])]
+            if conflits:
+                _ajouter_avertissement(
+                    ligne, "nom", nom_affiche,
+                    "Valeurs différentes de la base (" + ", ".join(conflits) + ") — seront mises à jour.",
+                )
+            for champ in ("sexe", "statut", "taux_horaire", "email", "telephone", "adresse"):
+                if donnees[champ] is None:
+                    donnees[champ] = getattr(existant, champ)
+            ligne.action = ActionLigne.MISE_A_JOUR
+            ligne.cible_id = existant.id
+        else:
+            ligne.action = ActionLigne.CREATION
 
-        ligne.action = ActionLigne.CREATION
-        ligne.donnees = {"nom": nom, "prenom": prenom, "sexe": sexe, "statut": statut, "taux_horaire": taux_horaire}
+        manquants = [libelle for champ, libelle in (("sexe", "sexe"), ("statut", "statut"),
+                                                    ("taux_horaire", "taux horaire")) if donnees[champ] is None]
+        donnees["a_completer"] = bool(manquants)
+        if manquants:
+            _ajouter_avertissement(
+                ligne, None, nom_affiche,
+                "Fiche à compléter (" + ", ".join(manquants) + ") : exclue de la paie tant qu'elle est incomplète.",
+            )
+        ligne.donnees = donnees
         rapport.lignes.append(ligne)
 
     return rapport
@@ -485,18 +666,17 @@ def executer_import_enseignants(
     with get_connection(db_path) as conn:
         try:
             for ligne in rapport_preparation.lignes:
+                if ligne.action not in (ActionLigne.CREATION, ActionLigne.MISE_A_JOUR):
+                    continue
+                d = ligne.donnees
+                enseignant = Enseignant(
+                    id=ligne.cible_id, nom=d["nom"], prenom=d["prenom"], sexe=d["sexe"], statut=d["statut"],
+                    taux_horaire=d["taux_horaire"], email=d.get("email"), telephone=d.get("telephone"),
+                    adresse=d.get("adresse"), actif=True,
+                )
                 if ligne.action == ActionLigne.CREATION:
-                    enseignant = Enseignant(
-                        nom=ligne.donnees["nom"], prenom=ligne.donnees["prenom"], sexe=ligne.donnees["sexe"],
-                        statut=ligne.donnees["statut"], taux_horaire=ligne.donnees["taux_horaire"], actif=True,
-                    )
                     enseignant_repository.creer(enseignant, conn=conn)
-                elif ligne.action == ActionLigne.MISE_A_JOUR:
-                    enseignant = Enseignant(
-                        id=ligne.cible_id, nom=ligne.donnees["nom"], prenom=ligne.donnees["prenom"],
-                        sexe=ligne.donnees["sexe"], statut=ligne.donnees["statut"],
-                        taux_horaire=ligne.donnees["taux_horaire"],
-                    )
+                else:
                     enseignant_repository.mettre_a_jour(enseignant, conn=conn)
         except Exception as erreur:  # noqa: BLE001
             conn.rollback()
@@ -561,6 +741,10 @@ def preparer_import_heures(
         enseignant = index_existants.get(cle)
         if enseignant is None:
             _ajouter_erreur(ligne, "nom", f"{nom} {prenom}", f"Enseignant inconnu : « {nom} {prenom} ».")
+            rapport.lignes.append(ligne)
+            continue
+        if not enseignant.est_complet:
+            _ajouter_erreur(ligne, "nom", f"{nom} {prenom}", message_fiche_incomplete(enseignant))
             rapport.lignes.append(ligne)
             continue
 
@@ -712,6 +896,10 @@ def preparer_import_remunerations(
             _ajouter_erreur(ligne, "nom", f"{nom} {prenom}", f"Enseignant inconnu : « {nom} {prenom} ».")
             rapport.lignes.append(ligne)
             continue
+        if not enseignant.est_complet:
+            _ajouter_erreur(ligne, "nom", f"{nom} {prenom}", message_fiche_incomplete(enseignant))
+            rapport.lignes.append(ligne)
+            continue
 
         if not periode_modifiable:
             _ajouter_erreur(
@@ -845,6 +1033,10 @@ def preparer_import_retenues(
         enseignant = index_existants.get(cle)
         if enseignant is None:
             _ajouter_erreur(ligne, "nom", f"{nom} {prenom}", f"Enseignant inconnu : « {nom} {prenom} ».")
+            rapport.lignes.append(ligne)
+            continue
+        if not enseignant.est_complet:
+            _ajouter_erreur(ligne, "nom", f"{nom} {prenom}", message_fiche_incomplete(enseignant))
             rapport.lignes.append(ligne)
             continue
 

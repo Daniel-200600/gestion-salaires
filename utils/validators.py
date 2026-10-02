@@ -151,6 +151,23 @@ def verifier_periode_ouverte(periode) -> None:
         )
 
 
+def message_fiche_incomplete(enseignant) -> str:
+    manquants = ", ".join(enseignant.champs_manquants)
+    return (f"La fiche de {enseignant.nom} {enseignant.prenom}".rstrip() + f" est incomplète (à renseigner : {manquants}). "
+            "Complétez-la dans Gestion › Enseignants avant de saisir ou de calculer sa paie.")
+
+
+def verifier_enseignant_payable(enseignant) -> None:
+    """
+    Lève un ValueError si l'enseignant ne peut pas recevoir de données de
+    paie : désactivé, ou fiche incomplète (sexe, statut ou taux horaire
+    manquant, cas d'un enseignant importé depuis une liste existante).
+    """
+    verifier_enseignant_actif(enseignant)
+    if not enseignant.est_complet:
+        raise ValueError(message_fiche_incomplete(enseignant))
+
+
 def verifier_enseignant_actif(enseignant) -> None:
     """
     Lève un ValueError si l'enseignant est désactivé.
