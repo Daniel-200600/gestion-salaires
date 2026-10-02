@@ -363,6 +363,33 @@ def test_repli_sur_le_modele_standard_si_fichier_disparu():
     assert bulletin_service.generer_bulletin_enseignant(p.id, e.id).chemin.suffix == ".docx"
 
 
+def test_aucune_alerte_quand_le_modele_choisi_est_utilisable():
+    assert modele_bulletin_service.probleme_modele_actif() is None
+    modele_bulletin_service.importer_modele("A", _docx_a_balises(), "a.docx", activer=True)
+    assert modele_bulletin_service.probleme_modele_actif() is None
+
+
+def test_alerte_a_l_ecran_si_le_fichier_du_modele_a_disparu():
+    modele = modele_bulletin_service.importer_modele("Bulletin 2026", _pdf_a_balises(), "a.pdf", activer=True)
+    modele.chemin.unlink()
+    alerte = modele_bulletin_service.probleme_modele_actif()
+    assert "« Bulletin 2026 »" in alerte and "introuvable" in alerte
+    assert "modèle Word standard" in alerte and "Administration › Modèles de bulletin" in alerte
+
+
+def test_alerte_a_l_ecran_si_le_modele_choisi_n_existe_plus():
+    from database.repositories import parametres_paie_repository
+
+    parametres_paie_repository.ecrire(modele_bulletin_service.CLE_MODELE_ACTIF, "importe_999")
+    assert "n'existe plus" in modele_bulletin_service.probleme_modele_actif()
+    assert modele_bulletin_service.obtenir_modele_actif().cle == modele_bulletin_service.CLE_STANDARD_WORD
+
+
+def test_les_pages_qui_produisent_des_bulletins_affichent_l_alerte():
+    for page in ("6_Bulletins_Paie.py", "17_Automatisation.py", "10_Administration.py"):
+        assert "probleme_modele_actif()" in (RACINE / "ui_pages" / page).read_text(encoding="utf-8"), page
+
+
 def test_regeneration_refusee_pour_periode_cloturee_quel_que_soit_le_format():
     modele_bulletin_service.activer_modele(modele_bulletin_service.CLE_STANDARD_PDF)
     e, p = _periode_validee_avec_enseignant()

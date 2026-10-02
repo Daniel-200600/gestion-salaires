@@ -171,24 +171,42 @@ def cle_modele_actif(db_path: DbPath = None) -> str:
     return parametres_paie_repository.lire(CLE_MODELE_ACTIF, db_path=db_path) or CLE_STANDARD_WORD
 
 
-def obtenir_modele_actif(db_path: DbPath = None) -> ModeleBulletin:
+def probleme_modele_actif(db_path: DbPath = None) -> Optional[str]:
     """
-    Modèle utilisé pour produire les bulletins. Si le modèle choisi n'est
-    plus disponible (fichier supprimé du disque, base restaurée sans le
-    dossier des modèles), le modèle Word standard est utilisé et
-    l'anomalie est journalisée — un bulletin n'est jamais bloqué pour
-    cette raison.
+    Message à afficher à l'écran si le modèle choisi par l'administrateur
+    ne peut pas être utilisé — les bulletins sont alors produits avec le
+    modèle Word standard. None si le modèle choisi est utilisable.
     """
     cle = cle_modele_actif(db_path=db_path)
+    remede = "Choisissez ou réimportez un modèle dans Administration › Modèles de bulletin."
     try:
         modele = obtenir_modele(cle, db_path=db_path)
     except ModeleBulletinError:
-        logger.warning("Modèle de bulletin actif « %s » introuvable : modèle Word standard utilisé.", cle)
+        return ("Le modèle de bulletin choisi n'existe plus : les bulletins sont produits avec le "
+                f"modèle Word standard. {remede}")
+    if not modele.chemin.exists():
+        return (f"Le fichier du modèle de bulletin « {modele.nom} » est introuvable sur cet ordinateur "
+                "(par exemple après une restauration ou un changement de poste) : les bulletins sont "
+                f"produits avec le modèle Word standard. {remede}")
+    if modele.format == "pdf" and not modele.zones:
+        return (f"Le modèle PDF « {modele.nom} » est incomplet (zones à remplir absentes) : les bulletins "
+                f"sont produits avec le modèle Word standard. {remede}")
+    return None
+
+
+def obtenir_modele_actif(db_path: DbPath = None) -> ModeleBulletin:
+    """
+    Modèle utilisé pour produire les bulletins. Si le modèle choisi n'est
+    plus disponible (voir `probleme_modele_actif`, affiché à l'écran par
+    les pages Bulletins, Automatisation et Administration), le modèle Word
+    standard est utilisé — un bulletin n'est jamais bloqué pour cette
+    raison.
+    """
+    probleme = probleme_modele_actif(db_path=db_path)
+    if probleme is not None:
+        logger.warning(probleme)
         return modele_standard_word()
-    if not modele.chemin.exists() or (modele.format == "pdf" and not modele.zones):
-        logger.warning("Fichier du modèle « %s » absent ou incomplet : modèle Word standard utilisé.", modele.nom)
-        return modele_standard_word()
-    return modele
+    return obtenir_modele(cle_modele_actif(db_path=db_path), db_path=db_path)
 
 
 # ---------------------------------------------------------------------

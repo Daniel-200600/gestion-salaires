@@ -42,6 +42,9 @@ st.caption(
     "Génère un bulletin individuel par enseignant, à partir des résultats déjà calculés par le moteur de paie. "
     f"Modèle utilisé : {modele_actif.libelle} (choix du modèle : Administration › Modèles de bulletin)."
 )
+probleme_modele = modele_bulletin_service.probleme_modele_actif()
+if probleme_modele:
+    st.warning(probleme_modele, icon=":material/warning:")
 
 # =======================================================================
 # 1. Sélection de la période

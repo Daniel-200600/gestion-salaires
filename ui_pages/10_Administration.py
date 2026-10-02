@@ -214,6 +214,9 @@ def _afficher_apercu(format_, contenu_bulletin: bytes, nom_fichier: str, cle: st
 with onglet_modeles:
     st.subheader("Modèle de bulletin actif")
     modele_actif = modele_bulletin_service.obtenir_modele_actif()
+    probleme_modele = modele_bulletin_service.probleme_modele_actif()
+    if probleme_modele:
+        st.warning(probleme_modele, icon=":material/warning:")
     st.write(
         f"Les bulletins sont produits avec le modèle **{modele_actif.libelle}**. "
         "Un seul modèle est actif à la fois ; le changement s'applique aux bulletins générés ensuite, "

@@ -19,7 +19,9 @@ from database.initialization import init_database
 from exports.excel_export import EXPORT_DIR
 from exports.word_export import EXPORT_DIR_BULLETINS
 from models.enums import StatutPeriode
-from services import automatisation_service, enseignant_service, periode_service, permission_service
+from services import (
+    automatisation_service, enseignant_service, modele_bulletin_service, periode_service, permission_service,
+)
 from services.automatisation_service import AutomatisationError
 from utils.formatters import libelle_statut_periode
 from utils.session_auth import exiger_permission
@@ -34,6 +36,9 @@ st.caption(
     "Orchestre les opérations déjà existantes (bulletins, exports, archivage) sur un ensemble d'enseignants — "
     "aucun calcul ni règle métier n'est reproduit ici."
 )
+probleme_modele = modele_bulletin_service.probleme_modele_actif()
+if probleme_modele:
+    st.warning(probleme_modele, icon=":material/warning:")
 
 periodes = periode_service.lister_periodes()
 if not periodes:
