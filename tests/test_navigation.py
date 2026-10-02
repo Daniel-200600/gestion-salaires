@@ -60,6 +60,7 @@ def test_composition_exacte_de_chaque_bloc():
     attendu = {
         "Tableau de bord": [
             "Tableau de bord", "Guide utilisateur", "Politique de confidentialité", "Conditions d'utilisation",
+            "À propos",
         ],
         "Gestion": ["Enseignants", "Périodes de paie"],
         "Paie": ["Données de paie", "Calcul de paie", "Cycle de paie", "Bulletins de solde", "Génération comptable"],

@@ -47,6 +47,7 @@ donnees_incluses = [
     (str(RACINE / "docs" / "guide_administrateur.md"), "docs"),
     (str(RACINE / "docs" / "politique_confidentialite.md"), "docs"),
     (str(RACINE / "docs" / "conditions_utilisation.md"), "docs"),
+    (str(RACINE / "docs" / "a_propos.md"), "docs"),
 ]
 # Streamlit lit ses propres fichiers (interface web, métadonnées de paquet)
 # à l'exécution : ils doivent être embarqués explicitement.

@@ -1,4 +1,4 @@
-# Gestion des Salaires — v1.1.0
+# Gestion des Salaires — v1.2.0
 
 [![tests](https://github.com/Daniel-200600/gestion-salaires/actions/workflows/tests.yml/badge.svg)](https://github.com/Daniel-200600/gestion-salaires/actions/workflows/tests.yml)
 ![Python](https://img.shields.io/badge/python-3.11-blue)
@@ -81,7 +81,7 @@ Sauvegarde via l'API native SQLite (`sqlite3.Connection.backup()`), jamais une s
 
 ## Version
 
-**1.1.0** — voir `config/settings.py` (`VERSION`), source unique du numéro de version.
+**1.2.0** — voir `config/settings.py` (`VERSION`), source unique du numéro de version.
 
 ## Tests
 

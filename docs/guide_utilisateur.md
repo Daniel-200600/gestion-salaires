@@ -26,7 +26,7 @@ La barre latérale regroupe les pages en sept blocs. Chaque page possède une ad
 
 | Bloc | Pages |
 |---|---|
-| Tableau de bord | Tableau de bord, Guide utilisateur, Politique de confidentialité, Conditions d'utilisation |
+| Tableau de bord | Tableau de bord, Guide utilisateur, Politique de confidentialité, Conditions d'utilisation, À propos |
 | Gestion | Enseignants, Périodes de paie |
 | Paie | Données de paie, Calcul de paie, Cycle de paie, Bulletins de solde, Génération comptable |
 | Contrôle & Historique | Contrôle de la paie, Historique de paie |
@@ -35,6 +35,8 @@ La barre latérale regroupe les pages en sept blocs. Chaque page possède une ad
 | Administration & Sécurité | Administration, Guide administrateur (administrateurs uniquement) |
 
 Le **Tableau de bord** affiche le nombre d'enseignants, les indicateurs de paie de la période choisie, les alertes actives et l'évolution de la masse salariale. Lorsqu'aucune donnée n'existe, la mention « Aucune donnée disponible. » s'affiche à la place des indicateurs.
+
+La page **À propos** indique la version installée, les nouveautés de chaque version, la licence et le contact de l'auteur. Indiquez ce numéro de version pour toute demande d'assistance.
 
 ## 3. Gestion des enseignants
 

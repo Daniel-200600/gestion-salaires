@@ -18,7 +18,10 @@ from config.paths import resource_root, user_data_root
 # l'afficher (page d'accueil, pied de page, README généré) importe
 # cette constante plutôt que de la dupliquer.
 NOM_APPLICATION = "Gestion des Salaires"
-VERSION = "1.1.0"
+# Auteur et contact affichés sur la page « À propos ».
+AUTEUR = "Daniel Tchomtchi"
+CONTACT_AUTEUR = "tchomtchidaniel@gmail.com"
+VERSION = "1.2.0"
 
 # Racine des ressources de l'application (lecture seule une fois installée :
 # templates, schéma SQL). Consciente de PyInstaller (module 20) — voir

@@ -16,6 +16,7 @@ DOCUMENTS: Dict[str, str] = {
     "guide_administrateur": "guide_administrateur.md",
     "politique_confidentialite": "politique_confidentialite.md",
     "conditions_utilisation": "conditions_utilisation.md",
+    "a_propos": "a_propos.md",
 }
 
 

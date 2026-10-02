@@ -45,7 +45,7 @@ def test_page_de_documentation_presente_et_protegee(chemin):
     assert "afficher_document(" in contenu
 
 
-@pytest.mark.parametrize("titre", ["Guide utilisateur", "Politique de confidentialité", "Conditions d'utilisation"])
+@pytest.mark.parametrize("titre", ["Guide utilisateur", "Politique de confidentialité", "Conditions d'utilisation", "À propos"])
 @pytest.mark.parametrize("role", list(RoleUtilisateur))
 def test_documentation_accessible_a_tous_les_roles(titre, role):
     titres = [e.titre for entrees in construire_blocs_visibles(role).values() for e in entrees]

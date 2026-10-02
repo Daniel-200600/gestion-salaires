@@ -47,6 +47,7 @@ PAGES_DOCUMENTATION = (
     f"{DOSSIER_PAGES}/19_Politique_Confidentialite.py",
     f"{DOSSIER_PAGES}/20_Conditions_Utilisation.py",
     f"{DOSSIER_PAGES}/21_Guide_Administrateur.py",
+    f"{DOSSIER_PAGES}/22_A_Propos.py",
 )
 
 DEFINITION_BLOCS: Dict[str, List[EntreeNavigation]] = {
@@ -66,6 +67,10 @@ DEFINITION_BLOCS: Dict[str, List[EntreeNavigation]] = {
         EntreeNavigation(
             "Conditions d'utilisation", _icone("gavel"), f"{DOSSIER_PAGES}/20_Conditions_Utilisation.py",
             permission_service.DOCUMENTATION_CONSULTER, url_path="conditions-utilisation",
+        ),
+        EntreeNavigation(
+            "À propos", _icone("info"), f"{DOSSIER_PAGES}/22_A_Propos.py",
+            permission_service.DOCUMENTATION_CONSULTER, url_path="a-propos",
         ),
     ],
     "Gestion": [
