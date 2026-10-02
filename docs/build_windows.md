@@ -56,10 +56,9 @@ droits administrateur), crée les raccourcis et un désinstalleur.
 
 Base, sauvegardes, modèles de bulletin importés et modèles propres à
 l'établissement : `%APPDATA%\GestionPaie\` (voir `config/paths.py`). Une mise à
-jour ou une désinstallation n'y touche pas. Pour utiliser les modèles de
-bulletin d'un établissement, copier le contenu de `data\modeles_etablissement\`
-(produit par `templates/build_template.py --etablissement --pdf`) dans
-`%APPDATA%\GestionPaie\modeles_etablissement\`.
+jour ou une désinstallation n'y touche pas. L'en-tête, le logo et la signature de
+l'établissement se règlent après installation, dans Administration › Paramètres :
+aucun fichier à copier.
 
 ## Avertissement Windows
 

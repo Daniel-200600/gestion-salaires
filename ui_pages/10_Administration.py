@@ -30,6 +30,7 @@ from services import (
     administration_service,
     backup_service,
     diagnostic_service,
+    identite_etablissement_service,
     modele_bulletin_service,
     parametres_paie_service,
     parametres_service,
@@ -41,6 +42,7 @@ from services import (
 from services.autorisation_service import AutorisationRefuseeError
 from services.backup_service import BackupServiceError
 from services.diagnostic_service import EtatSysteme
+from services.identite_etablissement_service import IdentiteEtablissementError
 from services.parametres_service import ParametresEtablissement
 from services.reinitialisation_service import (
     ELEMENTS_CONSERVES,
@@ -123,6 +125,73 @@ with onglet_parametres:
                 administration_service.enregistrer_parametres(acteur_id, nouveaux_parametres)
                 logger.info("Paramètres de l'établissement modifiés depuis l'interface.")
                 st.success("Paramètres enregistrés.")
+                st.rerun()
+            except AutorisationRefuseeError as erreur:
+                st.error(str(erreur))
+
+    st.divider()
+    st.subheader("En-tête du bulletin et logo")
+    st.caption(
+        "Ces éléments figurent sur les bulletins produits avec les modèles standard (Word et PDF). "
+        "Une ligne par ligne d'en-tête, dans l'ordre d'affichage. Ils sont enregistrés dans la base "
+        "et font donc partie des sauvegardes."
+    )
+    identite_configuree = identite_etablissement_service.obtenir_identite()
+    identite_actuelle = identite_configuree or identite_etablissement_service.identite_ou_neutre()
+    if identite_configuree is None:
+        st.info("En-tête neutre (« NOM DE L'ETABLISSEMENT ») : renseignez celui de votre établissement.")
+    if identite_actuelle.logo:
+        st.image(identite_actuelle.logo, caption="Logo actuel", width=120)
+
+    with st.form("formulaire_identite_etablissement"):
+        col_fr, col_en = st.columns(2)
+        with col_fr:
+            entete_fr = st.text_area("En-tête en français", value="\n".join(identite_actuelle.entete_fr), height=170)
+        with col_en:
+            entete_en = st.text_area("En-tête en anglais", value="\n".join(identite_actuelle.entete_en), height=170)
+        lieu_signature = st.text_input("Lieu de signature (« Fait à … le : »)", value=identite_actuelle.lieu_signature)
+        col_titre_fr, col_titre_en = st.columns(2)
+        with col_titre_fr:
+            titre_fr = st.text_input("Titre du signataire (français)", value=identite_actuelle.titre_signataire_fr)
+        with col_titre_en:
+            titre_en = st.text_input("Titre du signataire (anglais)", value=identite_actuelle.titre_signataire_en)
+        fichier_logo = st.file_uploader("Logo de l'établissement (PNG ou JPEG, 2 Mo au plus)", type=["png", "jpg", "jpeg"])
+        retirer_logo = (
+            st.checkbox("Retirer le logo actuel") if identite_actuelle.logo and identite_configuree else False
+        )
+        if st.form_submit_button("Enregistrer et produire les modèles de bulletin", type="primary"):
+            try:
+                with st.spinner("Production des modèles de bulletin…"):
+                    rapport_identite = administration_service.definir_identite_etablissement(
+                        acteur_id, entete_fr.splitlines(), entete_en.splitlines(), lieu_signature, titre_fr,
+                        titre_en, logo=fichier_logo.getvalue() if fichier_logo else None, retirer_logo=retirer_logo,
+                    )
+                st.session_state["identite_rapport"] = rapport_identite.avertissement_pdf or ""
+                st.rerun()
+            except (IdentiteEtablissementError, AutorisationRefuseeError) as erreur:
+                st.error(str(erreur))
+
+    if "identite_rapport" in st.session_state:
+        avertissement_identite = st.session_state.pop("identite_rapport")
+        st.success("En-tête enregistré : les modèles de bulletin de l'établissement sont à jour.")
+        if avertissement_identite:
+            st.warning(avertissement_identite)
+
+    col_essai, col_neutre = st.columns(2)
+    with col_essai:
+        try:
+            st.download_button(
+                "Télécharger un bulletin d'essai (Word)",
+                data=modele_bulletin_service.apercu_modele(modele_bulletin_service.modele_standard_word()),
+                file_name="bulletin_essai.docx",
+                mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+            )
+        except ModeleBulletinError as erreur:
+            st.error(str(erreur))
+    with col_neutre:
+        if identite_configuree is not None and st.button("Revenir à l'en-tête neutre"):
+            try:
+                administration_service.revenir_a_l_entete_neutre(acteur_id)
                 st.rerun()
             except AutorisationRefuseeError as erreur:
                 st.error(str(erreur))

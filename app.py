@@ -39,6 +39,7 @@ from database.initialization import init_database
 from exports.excel_export import EXPORT_DIR
 from exports.word_export import EXPORT_DIR_BULLETINS
 from services.backup_service import sauvegarde_automatique_si_necessaire
+from services.identite_etablissement_service import assurer_modeles_etablissement
 from utils.navigation import construire_blocs_visibles
 from utils.session_auth import afficher_bandeau_utilisateur, exiger_authentification, utilisateur_courant_role
 
@@ -57,6 +58,12 @@ EXPORT_DIR_BULLETINS.mkdir(parents=True, exist_ok=True)
 if st.session_state.get("_sauvegarde_auto_du") != date.today():
     sauvegarde_automatique_si_necessaire()
     st.session_state["_sauvegarde_auto_du"] = date.today()
+
+# Modèles de bulletin de l'établissement reconstruits s'ils manquent (base
+# restaurée sur un autre poste, par exemple). Une fois par session.
+if not st.session_state.get("_modeles_etablissement_verifies"):
+    assurer_modeles_etablissement()
+    st.session_state["_modeles_etablissement_verifies"] = True
 
 # Favicon : fichier image dédié (assets/favicon.png), jamais un emoji.
 # Résolu via config.paths.resource_root(), donc identique en

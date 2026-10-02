@@ -30,12 +30,15 @@ de l'application (compatibilité avec les tests et les valeurs
 préparées par services/bulletin_service.py).
 """
 
+import io
 import os
 import shutil
 import subprocess
 import sys
 import tempfile
+from dataclasses import dataclass
 from pathlib import Path
+from typing import Optional, Tuple
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
@@ -62,16 +65,30 @@ CHEMIN_TEMPLATE = DOSSIER / "bulletin_template.docx"
 CHEMIN_MODELE_PDF = DOSSIER / "bulletin_modele_standard.pdf"
 CHEMIN_ZONES_PDF = DOSSIER / "bulletin_modele_standard.json"
 
-# Par défaut : modèles NEUTRES livrés avec le dépôt (en-tête de
-# config/settings.py, sans logo). Avec --etablissement : en-tête et logo
-# lus dans config/etablissement_local.py (fichier local, exclu de Git) et
-# modèles écrits dans data/modeles_etablissement/, utilisés en priorité
-# par l'application (config.settings.chemin_modele_standard).
-ENTETE_FR, ENTETE_EN, LOGO = ETABLISSEMENT_ENTETE_FR, ETABLISSEMENT_ENTETE_EN, None
+
+@dataclass(frozen=True)
+class IdentiteEtablissement:
+    """Ce qui distingue le bulletin d'un établissement : en-tête, logo, signature."""
+
+    entete_fr: Tuple[str, ...]
+    entete_en: Tuple[str, ...]
+    logo: Optional[bytes] = None  # image PNG ou JPEG
+    lieu_signature: str = LIEU_SIGNATURE
+    titre_signataire_fr: str = TITRE_SIGNATAIRE_FR
+    titre_signataire_en: str = TITRE_SIGNATAIRE_EN
 
 
-def utiliser_version_etablissement() -> None:
-    global ENTETE_FR, ENTETE_EN, LOGO, CHEMIN_TEMPLATE, CHEMIN_MODELE_PDF, CHEMIN_ZONES_PDF
+# Modèles NEUTRES livrés avec l'application (en-tête de config/settings.py,
+# sans logo). L'identité réelle d'un établissement est réglée dans
+# Administration › Paramètres (services/identite_etablissement_service.py)
+# ou, pour le développeur, dans config/etablissement_local.py
+# (option --etablissement) ; ses modèles vont dans data/modeles_etablissement/,
+# utilisés en priorité par l'application (config.settings.chemin_modele_standard).
+IDENTITE_NEUTRE = IdentiteEtablissement(tuple(ETABLISSEMENT_ENTETE_FR), tuple(ETABLISSEMENT_ENTETE_EN))
+
+
+def identite_locale() -> IdentiteEtablissement:
+    """Identité lue dans config/etablissement_local.py (fichier local, exclu de Git)."""
     try:
         from config import etablissement_local as local
     except ImportError as erreur:
@@ -79,12 +96,24 @@ def utiliser_version_etablissement() -> None:
             "config/etablissement_local.py est introuvable : copiez config/etablissement_local.example.py "
             "et renseignez l'en-tête de l'établissement."
         ) from erreur
-    ENTETE_FR, ENTETE_EN = local.ETABLISSEMENT_ENTETE_FR, local.ETABLISSEMENT_ENTETE_EN
-    LOGO = Path(getattr(local, "LOGO_ETABLISSEMENT_PATH", LOGO_ETABLISSEMENT_PATH))
-    MODELES_ETABLISSEMENT_DIR.mkdir(parents=True, exist_ok=True)
-    CHEMIN_TEMPLATE = MODELES_ETABLISSEMENT_DIR / CHEMIN_TEMPLATE.name
-    CHEMIN_MODELE_PDF = MODELES_ETABLISSEMENT_DIR / CHEMIN_MODELE_PDF.name
-    CHEMIN_ZONES_PDF = MODELES_ETABLISSEMENT_DIR / CHEMIN_ZONES_PDF.name
+    logo = Path(getattr(local, "LOGO_ETABLISSEMENT_PATH", LOGO_ETABLISSEMENT_PATH))
+    return IdentiteEtablissement(
+        entete_fr=tuple(local.ETABLISSEMENT_ENTETE_FR),
+        entete_en=tuple(local.ETABLISSEMENT_ENTETE_EN),
+        logo=logo.read_bytes() if logo.exists() else None,
+        lieu_signature=getattr(local, "LIEU_SIGNATURE", LIEU_SIGNATURE),
+        titre_signataire_fr=getattr(local, "TITRE_SIGNATAIRE_FR", TITRE_SIGNATAIRE_FR),
+        titre_signataire_en=getattr(local, "TITRE_SIGNATAIRE_EN", TITRE_SIGNATAIRE_EN),
+    )
+
+
+def trouver_libreoffice() -> Optional[str]:
+    """Exécutable LibreOffice (nécessaire au seul modèle PDF), ou None s'il n'est pas installé."""
+    executable = shutil.which("soffice") or shutil.which("libreoffice")
+    if executable is None:
+        candidat = Path(os.environ.get("ProgramFiles", r"C:\Program Files")) / "LibreOffice" / "program" / "soffice.exe"
+        executable = str(candidat) if candidat.exists() else None
+    return executable
 
 # Champs remplis par le modèle PDF standard (identiques à ceux du modèle Word).
 BALISES_MODELE_PDF_STANDARD = (
@@ -291,7 +320,7 @@ def _lignes_entete(textes, francais: bool):
     return lignes
 
 
-def _entete(cellule) -> None:
+def _entete(cellule, identite: IdentiteEtablissement) -> None:
     cellule.text = ""
     _paragraphe_compact(cellule.paragraphs[0])
     cellule.paragraphs[0].paragraph_format.line_spacing = Pt(1)
@@ -299,21 +328,21 @@ def _entete(cellule) -> None:
     largeurs = [212.1, 110.0, 206.2]
     _bordures_tableau(imbrique, exterieur=0)
     _grille_fixe(imbrique, largeurs)
-    _texte_entete(imbrique.cell(0, 0), _lignes_entete(ENTETE_FR, True), 16, 16)
-    _texte_entete(imbrique.cell(0, 2), _lignes_entete(ENTETE_EN, False), 25, 26)
+    _texte_entete(imbrique.cell(0, 0), _lignes_entete(identite.entete_fr, True), 16, 16)
+    _texte_entete(imbrique.cell(0, 2), _lignes_entete(identite.entete_en, False), 25, 26)
     cellule_logo = imbrique.cell(0, 1)
     cellule_logo.vertical_alignment = WD_CELL_VERTICAL_ALIGNMENT.TOP
     paragraphe = cellule_logo.paragraphs[0]
     _paragraphe_compact(paragraphe)
-    if LOGO is not None and LOGO.exists():
-        paragraphe.add_run().add_picture(str(LOGO), width=Pt(101.5), height=Pt(73.8))
+    if identite.logo:
+        paragraphe.add_run().add_picture(io.BytesIO(identite.logo), width=Pt(101.5), height=Pt(73.8))
 
 
 # ---------------------------------------------------------------------
 # Construction
 # ---------------------------------------------------------------------
 
-def construire_document(variante: str = "word") -> Document:
+def construire_document(variante: str = "word", identite: IdentiteEtablissement = IDENTITE_NEUTRE) -> Document:
     b = _balises(variante)
     document = Document()
     section = document.sections[0]
@@ -342,7 +371,7 @@ def construire_document(variante: str = "word") -> Document:
     # 0. En-tête institutionnel ---------------------------------------
     _hauteur(table.rows[0], 80.2)
     c = _fusion(table, 0, 0, 6)
-    _entete(c)
+    _entete(c, identite)
     _bordures_cellule(c, bottom=TRAIT_EPAIS)
 
     # 1. BULLETIN DE SOLDE / PAYSLIP | mois -----------------------------
@@ -455,7 +484,7 @@ def construire_document(variante: str = "word") -> Document:
     _hauteur(table.rows[15], 14.0)
     _ecrire(table.cell(15, 0), "")
     cellule_lieu = _fusion(table, 15, 1, 6)
-    _ecrire(cellule_lieu, f"Done at {LIEU_SIGNATURE} on the / Fait à {LIEU_SIGNATURE} le:",
+    _ecrire(cellule_lieu, f"Done at {identite.lieu_signature} on the / Fait à {identite.lieu_signature} le:",
             vertical=WD_CELL_VERTICAL_ALIGNMENT.TOP)
     _bordures_cellule(table.cell(15, 0), top=TRAIT_EPAIS)
     _bordures_cellule(cellule_lieu, top=TRAIT_EPAIS)
@@ -466,7 +495,7 @@ def construire_document(variante: str = "word") -> Document:
 
     # 17. Titre du signataire ----------------------------------------------
     _hauteur(table.rows[17], 13.8)
-    _ecrire(_fusion(table, 17, 0, 6), TITRE_SIGNATAIRE_FR + TITRE_SIGNATAIRE_EN,
+    _ecrire(_fusion(table, 17, 0, 6), identite.titre_signataire_fr + identite.titre_signataire_en,
             alignement=WD_ALIGN_PARAGRAPH.RIGHT, police=POLICE_SIGNATURE, retrait_droit=34.0)
 
     # 18. Marge basse du cadre ---------------------------------------------
@@ -486,13 +515,17 @@ def _fusionner_ligne_en_deux(table, ligne: int, colonne_coupure: int) -> None:
     _fusion(table, ligne, colonne_coupure, 6)
 
 
-def construire_template() -> Path:
-    """Construit templates/bulletin_template.docx (modèle Word standard)."""
-    construire_document("word").save(CHEMIN_TEMPLATE)
-    return CHEMIN_TEMPLATE
+def construire_template(chemin: Path = CHEMIN_TEMPLATE, identite: IdentiteEtablissement = IDENTITE_NEUTRE) -> Path:
+    """Construit le modèle Word standard (par défaut : templates/bulletin_template.docx, neutre)."""
+    chemin.parent.mkdir(parents=True, exist_ok=True)
+    construire_document("word", identite).save(chemin)
+    return chemin
 
 
-def construire_modele_pdf() -> Path:
+def construire_modele_pdf(
+    chemin_pdf: Path = CHEMIN_MODELE_PDF, chemin_zones: Path = CHEMIN_ZONES_PDF,
+    identite: IdentiteEtablissement = IDENTITE_NEUTRE,
+) -> Path:
     """
     Construit templates/bulletin_modele_standard.pdf et sa description
     templates/bulletin_modele_standard.json.
@@ -512,15 +545,12 @@ def construire_modele_pdf() -> Path:
     from exports import pdf_export
     from utils.detection_bulletin import suggerer_correspondances
 
-    executable = shutil.which("soffice") or shutil.which("libreoffice")
-    if executable is None:
-        candidat = Path(os.environ.get("ProgramFiles", r"C:\Program Files")) / "LibreOffice" / "program" / "soffice.exe"
-        executable = str(candidat) if candidat.exists() else None
+    executable = trouver_libreoffice()
     if executable is None:
         raise RuntimeError("LibreOffice est nécessaire pour construire le modèle PDF standard.")
     with tempfile.TemporaryDirectory() as dossier:
         source = Path(dossier) / "bulletin_modele_standard.docx"
-        construire_document("exemple").save(source)
+        construire_document("exemple", identite).save(source)
         subprocess.run(
             [executable, "--headless", "--convert-to", "pdf", "--outdir", dossier, str(source)],
             check=True, capture_output=True, timeout=180,
@@ -534,14 +564,17 @@ def construire_modele_pdf() -> Path:
     if trouvees != attendues:
         raise RuntimeError(f"Détection incomplète du modèle standard : manquent {sorted(attendues - trouvees)}")
     zones = [pdf_export.zone_depuis_segment(s, propositions[s.id]).to_dict() for s in segments if s.id in propositions]
-    CHEMIN_MODELE_PDF.write_bytes(contenu)
-    CHEMIN_ZONES_PDF.write_text(json.dumps(zones, ensure_ascii=False, indent=1), encoding="utf-8")
-    return CHEMIN_MODELE_PDF
+    chemin_pdf.parent.mkdir(parents=True, exist_ok=True)
+    chemin_pdf.write_bytes(contenu)
+    chemin_zones.write_text(json.dumps(zones, ensure_ascii=False, indent=1), encoding="utf-8")
+    return chemin_pdf
 
 
 if __name__ == "__main__":
     if "--etablissement" in sys.argv:
-        utiliser_version_etablissement()
-    print(f"Modèle Word créé : {construire_template()}")
+        identite, dossier = identite_locale(), MODELES_ETABLISSEMENT_DIR
+    else:
+        identite, dossier = IDENTITE_NEUTRE, DOSSIER
+    print(f"Modèle Word créé : {construire_template(dossier / CHEMIN_TEMPLATE.name, identite)}")
     if "--pdf" in sys.argv:
-        print(f"Modèle PDF créé : {construire_modele_pdf()}")
+        print(f"Modèle PDF créé : {construire_modele_pdf(dossier / CHEMIN_MODELE_PDF.name, dossier / CHEMIN_ZONES_PDF.name, identite)}")

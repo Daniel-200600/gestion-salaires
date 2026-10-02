@@ -40,6 +40,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Dict, List, Optional, Union
 
+from config.paths import resource_root
 from config.settings import MODELES_BULLETIN_DIR, chemin_modele_standard
 from database.repositories import audit_log_repository, modele_bulletin_repository, parametres_paie_repository
 from exports import pdf_export, word_export
@@ -61,8 +62,9 @@ TAILLE_MAX_OCTETS = 10 * 1024 * 1024
 FORMATS = {".docx": "docx", ".pdf": "pdf"}
 LIBELLES_FORMAT = {"docx": "Word (.docx)", "pdf": "PDF"}
 
-CHEMIN_STANDARD_PDF = chemin_modele_standard("bulletin_modele_standard.pdf")
-CHEMIN_ZONES_STANDARD_PDF = chemin_modele_standard("bulletin_modele_standard.json")
+NOM_MODELE_WORD_STANDARD = "bulletin_template.docx"
+NOM_MODELE_PDF_STANDARD = "bulletin_modele_standard.pdf"
+NOM_ZONES_PDF_STANDARD = "bulletin_modele_standard.json"
 
 
 class ModeleBulletinError(ValueError):
@@ -123,17 +125,27 @@ def _dossier_modeles() -> Path:
     return MODELES_BULLETIN_DIR
 
 
+# Les chemins des modèles standard sont résolus à chaque appel : des modèles
+# propres à l'établissement produits pendant que l'application tourne
+# (Administration › Paramètres) sont utilisés immédiatement.
+
 def modele_standard_word() -> ModeleBulletin:
     return ModeleBulletin(cle=CLE_STANDARD_WORD, nom="Bulletin officiel", format="docx",
-                          chemin=word_export.TEMPLATE_PATH, standard=True)
+                          chemin=chemin_modele_standard(NOM_MODELE_WORD_STANDARD), standard=True)
 
 
 def modele_standard_pdf() -> ModeleBulletin:
+    # Le PDF et la description de ses zones vont toujours ensemble.
+    chemin_pdf = chemin_modele_standard(NOM_MODELE_PDF_STANDARD)
+    chemin_zones = chemin_pdf.with_name(NOM_ZONES_PDF_STANDARD)
+    if not chemin_zones.exists():
+        chemin_pdf = resource_root() / "templates" / NOM_MODELE_PDF_STANDARD
+        chemin_zones = chemin_pdf.with_name(NOM_ZONES_PDF_STANDARD)
     zones = []
-    if CHEMIN_ZONES_STANDARD_PDF.exists():
-        zones = [pdf_export.ZonePdf.from_dict(z) for z in json.loads(CHEMIN_ZONES_STANDARD_PDF.read_text(encoding="utf-8"))]
+    if chemin_zones.exists():
+        zones = [pdf_export.ZonePdf.from_dict(z) for z in json.loads(chemin_zones.read_text(encoding="utf-8"))]
     return ModeleBulletin(cle=CLE_STANDARD_PDF, nom="Bulletin officiel", format="pdf",
-                          chemin=CHEMIN_STANDARD_PDF, standard=True, zones=zones)
+                          chemin=chemin_pdf, standard=True, zones=zones)
 
 
 def _depuis_ligne(ligne) -> ModeleBulletin:

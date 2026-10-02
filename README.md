@@ -89,7 +89,7 @@ Sauvegarde via l'API native SQLite (`sqlite3.Connection.backup()`), jamais une s
 python -m pytest -q
 ```
 
-Résultat de référence : **1487 passed, 3 skipped** (version 1.1.0 ; voir `docs/bulletins_taxe_statut.md`).
+Résultat de référence : **1537 passed, 3 skipped** (version 1.2.0 ; voir `docs/bulletins_taxe_statut.md`).
 
 ## Licence
 

@@ -154,7 +154,7 @@ def generer_document_bulletin(valeurs: Dict[str, str], template_path: Optional[P
     tous les placeholders remplacés par `valeurs`. Ne sauvegarde rien
     sur disque (cf. `sauvegarder_document`).
     """
-    chemin_template = template_path if template_path is not None else TEMPLATE_PATH
+    chemin_template = template_path if template_path is not None else chemin_modele_standard("bulletin_template.docx")
     if not chemin_template.exists():
         raise WordExportError(
             f"Le template officiel est introuvable : {chemin_template}. "

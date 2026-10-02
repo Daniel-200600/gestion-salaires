@@ -33,6 +33,7 @@ from services import (
     backup_service,
     diagnostic_service,
     enseignant_service,
+    identite_etablissement_service,
     modele_bulletin_service,
     parametres_paie_service,
     parametres_service,
@@ -240,6 +241,24 @@ def supprimer_periode(acteur_id: Optional[int], periode_id: int, confirmation: b
 # ---------------------------------------------------------------------
 # Paramètres de paie (taux de taxe) — ADMIN uniquement
 # ---------------------------------------------------------------------
+
+def definir_identite_etablissement(
+    acteur_id: Optional[int],
+    entete_fr, entete_en, lieu_signature: str, titre_signataire_fr: str, titre_signataire_en: str,
+    logo: Optional[bytes] = None, retirer_logo: bool = False, db_path: DbPath = None,
+):
+    """En-tête, logo et signature du bulletin ; produit les modèles de l'établissement."""
+    acteur = exiger_permission_utilisateur(acteur_id, permission_service.PARAMETRE_MODIFIER, db_path)
+    return identite_etablissement_service.enregistrer_identite(
+        entete_fr, entete_en, lieu_signature, titre_signataire_fr, titre_signataire_en,
+        logo=logo, retirer_logo=retirer_logo, utilisateur=acteur.username, db_path=db_path,
+    )
+
+
+def revenir_a_l_entete_neutre(acteur_id: Optional[int], db_path: DbPath = None) -> None:
+    acteur = exiger_permission_utilisateur(acteur_id, permission_service.PARAMETRE_MODIFIER, db_path)
+    identite_etablissement_service.revenir_a_l_entete_neutre(utilisateur=acteur.username, db_path=db_path)
+
 
 def definir_taux_taxe_defaut(acteur_id: Optional[int], pourcentage, db_path: DbPath = None):
     """Taux appliqué aux périodes créées ensuite. Aucune période existante n'est modifiée."""

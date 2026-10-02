@@ -223,7 +223,7 @@ FONCTIONS_BAS_NIVEAU_INTERDITES_DANS_LES_PAGES = {
     "creer_utilisateur", "modifier_utilisateur", "desactiver_utilisateur", "activer_utilisateur",
     "reinitialiser_mot_de_passe", "changer_mot_de_passe", "reinitialiser_tous_les_comptes",
     "restaurer_sauvegarde_brute", "enregistrer_parametres", "supprimer_enseignant_definitivement",
-    "supprimer_periode_definitivement",
+    "supprimer_periode_definitivement", "enregistrer_identite",
 }
 
 

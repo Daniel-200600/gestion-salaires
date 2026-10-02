@@ -62,7 +62,7 @@ donnees_incluses += [
 # app.py et ui_pages/ sont exécutés par Streamlit, pas importés : PyInstaller
 # ne voit donc pas les modules qu'ils utilisent. On les déclare tous.
 modules_application = [
-    module for paquet in ("config", "database", "exports", "models", "services", "utils")
+    module for paquet in ("config", "database", "exports", "models", "services", "templates", "utils")
     for module in collect_submodules(paquet)
 ]
 
