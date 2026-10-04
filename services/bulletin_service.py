@@ -206,10 +206,7 @@ def _valider_bulletin_genere(chemin: Path, resultat: ResultatPaie, libelle_perio
         chemin.unlink(missing_ok=True)
         raise BulletinServiceError(f"Contrôle de validité échoué : {message}")
 
-    if not resultat.nom or not resultat.nom.strip():
-        _echec("le nom de l'enseignant est manquant.")
-    if not resultat.prenom or not resultat.prenom.strip():
-        _echec("le prénom de l'enseignant est manquant.")
+    # Nom ou prénom manquant : signalé par le contrôle de paie, jamais bloquant ici.
     if not libelle_periode or not libelle_periode.strip():
         _echec("le libellé de la période est manquant.")
     if resultat.statut is None:
@@ -232,6 +229,8 @@ def _valider_bulletin_genere(chemin: Path, resultat: ResultatPaie, libelle_perio
 
     if resultat.net_a_percevoir is None:
         _echec("le net à percevoir est manquant.")
+    if resultat.net_a_percevoir < 0:
+        _echec("le net à payer est négatif (les retenues dépassent les gains) : corrigez les données de paie.")
 
     if chemin.suffix.lower() == ".pdf":
         try:
@@ -251,7 +250,10 @@ def _valider_bulletin_genere(chemin: Path, resultat: ResultatPaie, libelle_perio
     if "{{" in contenu or "}}" in contenu:
         _echec("un placeholder non remplacé subsiste dans le document.")
 
-    if resultat.nom.upper() not in chemin.name.upper():
+    # Comparaison sur le nom tel qu'il est écrit dans le nom de fichier (espaces et caractères interdits
+    # remplacés par « _ ») : un nom composé ou avec apostrophe ne fait jamais échouer le bulletin.
+    nom_dans_fichier = nettoyer_nom_fichier((resultat.nom or "").upper())
+    if (resultat.nom or "").strip() and nom_dans_fichier.upper() not in chemin.name.upper():
         _echec("le nom du fichier ne correspond pas à l'enseignant du bulletin.")
 
 

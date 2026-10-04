@@ -44,7 +44,7 @@ La page **À propos** indique la version installée, les nouveautés de chaque v
 
 Page **Gestion › Enseignants**.
 
-- **Création** : ouvrez **Ajouter un enseignant**, renseignez le nom, le prénom, le sexe, le statut (permanent ou vacataire) et le taux horaire en FCFA, puis cliquez sur **Enregistrer l'enseignant**. Les champs marqués d'un astérisque sont obligatoires.
+- **Création** : ouvrez **Ajouter un enseignant**, renseignez le nom, le prénom, le sexe, le statut (permanent ou vacataire) et le taux horaire en FCFA, puis cliquez sur **Enregistrer l'enseignant**. Les champs marqués d'un astérisque sont obligatoires. Le prénom est facultatif : certains noms n'en comportent pas.
 - **Permanent payé au mois** : pour un permanent qui touche un salaire mensuel fixe, renseignez **Salaire mensuel fixe (FCFA)** ; le taux horaire peut alors rester vide. Ce montant remplace heures × taux horaire dans le calcul ; les heures restent saisies à titre d'information. Le salaire fixe est réservé aux permanents ; pour revenir à un paiement à l'heure, videz ce champ (onglet **Modifier**). La liste indique la rémunération de chacun (« 150 000 FCFA / mois » ou « 1 800 FCFA / h »).
 - **Reprise d'une liste existante** : si vous possédez déjà la liste de vos enseignants (Excel, Word ou PDF), inutile de la ressaisir : importez-la depuis **Documents & Opérations › Importation**, type « Enseignants » (voir section 11). Seul le nom est indispensable ; les informations absentes de la liste se complètent ensuite ici.
 - **Recherche et liste** : la liste peut être filtrée par un terme de recherche ; les enseignants désactivés peuvent être affichés ou masqués. La colonne **Fiche** indique « Complète » ou les informations qui manquent ; la case **Seulement les fiches à compléter** n'affiche que ces dernières.
@@ -94,7 +94,7 @@ Page **Paie › Import du fichier de paie** (administrateurs et gestionnaires de
    - Un **permanent** dont le gain est un montant saisi (sans taux horaire) est enregistré avec un **salaire mensuel fixe**.
    - Le net de chaque ligne est recalculé par l'application et comparé à celui de l'état comptable ; un écart est signalé, jamais corrigé en silence (il vient en général d'heures différentes entre les feuilles, de l'arrondi de la taxe ou d'une prime que l'application taxe).
    - Un nom écrit autrement dans deux feuilles, un enseignant déjà enregistré dont la fiche change (taux, statut…) ou un nom proche d'une fiche existante sont aussi signalés.
-3. **Compléter ou corriger** : le tableau reprend chaque ligne ; modifiez une case (double-clic), décochez **Importer** pour écarter une ligne, puis cliquez sur **Vérifier à nouveau**. Une ligne en erreur (sexe, statut ou taux manquant, enseignant désactivé…) doit être corrigée ou décochée.
+3. **Compléter ou corriger** : le tableau reprend chaque ligne ; modifiez une case (double-clic), décochez **Importer** pour écarter une ligne, puis cliquez sur **Vérifier à nouveau**. Une ligne en erreur (sexe, statut ou taux manquant, taux horaire nul, net négatif — les retenues dépassent les gains —, enseignant désactivé…) doit être corrigée ou décochée. Un nom absent ou incomplet ne bloque jamais : une ligne sans nom est enregistrée sous un nom provisoire (« SANS NOM 12 »), à corriger ensuite dans Gestion › Enseignants.
 4. **Valider** : cochez la confirmation, puis **Enregistrer dans la période**. Les fiches sont créées ou mises à jour (le nom d'une fiche existante est conservé) et les heures, primes et retenues sont enregistrées dans la période, en une seule opération : en cas d'erreur, rien n'est enregistré. Les données déjà saisies pour ces enseignants dans la période sont remplacées. L'import est inscrit au journal d'audit.
 5. Poursuivez avec **Calcul de paie** puis **Contrôle de la paie** (liens proposés après l'enregistrement).
 
@@ -133,7 +133,7 @@ Pour une période clôturée, un bulletin déjà existant n'est jamais régéné
 
 Page **Contrôle & Historique › Contrôle de la paie**.
 
-- **Anomalies** : la page liste les erreurs bloquantes (par exemple heures négatives, taux horaire invalide, montant négatif, total d'heures incohérent) et les avertissements à examiner (par exemple volume d'heures élevé, dette ou retenue élevée). Chaque ligne indique son niveau en toutes lettres.
+- **Anomalies** : la page liste les erreurs bloquantes (par exemple heures négatives, taux horaire invalide, montant négatif, net à payer négatif, total d'heures incohérent) et les avertissements à examiner (par exemple volume d'heures élevé, dette ou retenue élevée, nom ou prénom manquant). Un nom incomplet est signalé mais n'empêche jamais la validation ni les bulletins ; un net négatif empêche la validation et le bulletin de l'enseignant concerné. Chaque ligne indique son niveau en toutes lettres.
 - **Validation** : **Valider cette période**, puis **Confirmer la validation**. La validation est refusée tant qu'une erreur bloquante subsiste.
 - **Clôture** (administrateurs) : **Clôturer cette période**, puis **Confirmer la clôture**. La clôture est définitive.
 

@@ -67,9 +67,9 @@ def test_refus_nom_uniquement_espaces():
         _creer_enseignant_valide(nom="   ")
 
 
-def test_refus_prenom_vide():
-    with pytest.raises(EnseignantValidationError):
-        _creer_enseignant_valide(prenom="")
+def test_prenom_facultatif():
+    # Certains noms ne comportent pas de prénom : la fiche est acceptée (version 1.7.1).
+    assert _creer_enseignant_valide(prenom="").prenom == ""
 
 
 def test_refus_sexe_invalide():

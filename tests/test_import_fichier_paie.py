@@ -197,3 +197,44 @@ def test_valeurs_decimales_du_tableau_modifie(periode):
     ligne = dict(_lire(VACATAIRE).lignes[0], taux_horaire=1800.0, net_fichier=29020.0, sn=1.0, dette=float("nan"))
     verifiee = svc.verifier_lignes([ligne], periode.id)[0]
     assert (verifiee.erreurs, verifiee.ecart, verifiee.donnees["sn"], verifiee.donnees["dette"]) == ([], 0, 1, None)
+
+
+def test_nom_absent_ne_bloque_pas(periode):
+    lu = _lire(dict(VACATAIRE, nom="SANS-IDENTITE"))
+    lu.lignes[0]["nom_complet"] = None  # case du nom vidée dans le tableau
+    ligne = svc.verifier_lignes(lu.lignes, periode.id)[0]
+    assert ligne.erreurs == [] and ligne.donnees["nom_complet"] == "SANS NOM 1"
+    assert "nom provisoire « SANS NOM 1 »" in ligne.remarques[0]
+    svc.enregistrer_lignes([ligne], periode.id, "paie.xlsm")
+    assert enseignant_service.lister_enseignants()[0].nom == "SANS NOM 1"
+
+
+def test_nom_d_un_seul_mot_accepte_jusqu_au_bulletin(periode):
+    from services import bulletin_service, controle_paie_service
+
+    ligne = svc.verifier_lignes(_lire(dict(VACATAIRE, nom="TCHOUA")).lignes, periode.id)[0]
+    assert ligne.erreurs == []
+    svc.enregistrer_lignes([ligne], periode.id, "paie.xlsm")
+    enseignant = enseignant_service.lister_enseignants()[0]
+    assert (enseignant.nom, enseignant.prenom) == ("TCHOUA", "")
+    periode = periode_service.valider_periode(periode.id)  # aucune erreur bloquante
+    assert not controle_paie_service.controler_periode(periode.id).est_bloque
+    bulletin = bulletin_service.generer_bulletin_enseignant(periode.id, enseignant.id)
+    assert bulletin.chemin.exists()
+
+
+def test_taux_nul_et_net_negatif_bloquent_des_l_import(periode):
+    taux_nul = dict(VACATAIRE, nom="ATEBA Paul", taux=0)
+    sans_heures = dict(VACATAIRE, nom="BIYA Rene", s=[None, None, None, None])  # 5 000 de retenue, aucun gain
+    lignes = svc.verifier_lignes(_lire(taux_nul, sans_heures).lignes, periode.id)
+    assert lignes[0].erreurs == ["Taux horaire nul : indiquez le taux (ou un salaire fixe pour un permanent)."]
+    assert lignes[1].net_calcule == -5000 and lignes[1].erreurs[0].startswith("Net négatif (-5000 FCFA)")
+
+
+def test_bulletin_d_un_nom_compose(periode):
+    from services import bulletin_service
+
+    svc.enregistrer_lignes(svc.verifier_lignes(_lire(VACATAIRE).lignes, periode.id), periode.id, "paie.xlsm")
+    enseignant = enseignant_service.lister_enseignants()[0]
+    assert enseignant.nom == "BELLA NGONO"  # nom composé : « BELLA_NGONO » dans le nom du fichier
+    assert bulletin_service.generer_bulletin_enseignant(periode.id, enseignant.id).chemin.exists()

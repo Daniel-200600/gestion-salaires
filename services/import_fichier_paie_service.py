@@ -386,8 +386,11 @@ def _verifier_ligne(ligne: LigneVerifiee, par_cle, existants, vus, periode) -> N
     d = ligne.donnees
     nom_complet = nettoyer_texte(str(d.get("nom_complet") or ""))
     if not nom_complet:
-        ligne.erreurs.append("Nom absent.")
-        return
+        # Un nom manquant n'empêche pas la paie : nom provisoire, à corriger ensuite.
+        nom_complet = nom_provisoire(d.get("sn"))
+        d["nom_complet"] = nom_complet
+        ligne.remarques.append(f"Nom absent : la fiche sera créée sous le nom provisoire « {nom_complet} », à "
+                               "corriger dans Gestion › Enseignants.")
     cle = _cle_identite(nom_complet, "")
     if cle in vus:
         ligne.erreurs.append(f"Même enseignant que la ligne S/N {vus[cle]} : gardez une seule des deux lignes.")
@@ -405,9 +408,12 @@ def _verifier_ligne(ligne: LigneVerifiee, par_cle, existants, vus, periode) -> N
         ligne.erreurs.append("Montant négatif.")
     if salaire is not None and statut == StatutEnseignant.VACATAIRE:
         ligne.erreurs.append("Le salaire mensuel fixe est réservé aux permanents.")
-    if taux is None and not (statut == StatutEnseignant.PERMANENT and salaire is not None):
+    paye_a_l_heure = not (statut == StatutEnseignant.PERMANENT and salaire is not None)
+    if taux is None and paye_a_l_heure:
         ligne.erreurs.append("Taux horaire manquant." if statut != StatutEnseignant.PERMANENT
                              else "Taux horaire ou salaire fixe manquant.")
+    elif taux == 0 and paye_a_l_heure:
+        ligne.erreurs.append("Taux horaire nul : indiquez le taux (ou un salaire fixe pour un permanent).")
 
     heures = {}
     for numero, semaine in enumerate(SEMAINES, start=1):
@@ -455,6 +461,9 @@ def _verifier_ligne(ligne: LigneVerifiee, par_cle, existants, vus, periode) -> N
         taux_taxe=periode.taux_taxe, taxe_permanents=periode.taxe_permanents,
     )
     ligne.net_calcule = calcul.net_a_percevoir
+    if ligne.net_calcule < 0:
+        ligne.erreurs.append(f"Net négatif ({ligne.net_calcule} FCFA) : les retenues dépassent les gains. "
+                             "Vérifiez les heures, la retenue amicale et la dette.")
     if ligne.ecart:
         ligne.remarques.append(f"Net du fichier : {d['net_fichier']} FCFA ; net calculé : {ligne.net_calcule} FCFA "
                                f"(écart de {ligne.ecart:+d} FCFA).")
@@ -550,6 +559,11 @@ def enregistrer_lignes(
     return rapport
 
 
+def nom_provisoire(sn) -> str:
+    """Nom donné à une ligne sans nom, pour que la paie puisse être traitée quand même."""
+    return f"SANS NOM {sn}" if sn is not None else "SANS NOM"
+
+
 def _remuneration_effective(d: dict, statut, existant: Optional[Enseignant]) -> Tuple[Optional[int], Optional[int]]:
     """
     Taux horaire et salaire fixe qui seront enregistrés : ceux du tableau ; pour
@@ -569,6 +583,8 @@ def _fiche(ligne: LigneVerifiee) -> Enseignant:
     d = ligne.donnees
     existant = ligne.enseignant_existant
     nom, prenom = separer_nom_complet(str(d["nom_complet"]))
+    if str(d["nom_complet"]).startswith(nom_provisoire(None)):  # nom provisoire gardé entier
+        nom, prenom = str(d["nom_complet"]), ""
     statut = interpreter_statut(str(d["statut"]))
     taux, salaire = _remuneration_effective(d, statut, existant)
     if existant is None:

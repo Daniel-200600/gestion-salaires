@@ -117,12 +117,15 @@ def _nom_complet(resultat: ResultatPaie) -> str:
 def _controler_identite(resultat: ResultatPaie) -> List[Anomalie]:
     nom = _nom_complet(resultat)
     anomalies: List[Anomalie] = []
+    # Un nom incomplet ou mal écrit ne bloque jamais la paie : il est seulement signalé.
     if not resultat.nom or not resultat.nom.strip():
-        anomalies.append(Anomalie(NiveauAnomalie.ERREUR, "NOM_MANQUANT", resultat.enseignant_id, nom,
-                                   "Le nom de l'enseignant est manquant."))
+        anomalies.append(Anomalie(NiveauAnomalie.AVERTISSEMENT, "NOM_MANQUANT", resultat.enseignant_id, nom,
+                                   "Le nom de l'enseignant est manquant.",
+                                   recommandation="Complétez la fiche dans Gestion › Enseignants."))
     if not resultat.prenom or not resultat.prenom.strip():
-        anomalies.append(Anomalie(NiveauAnomalie.ERREUR, "PRENOM_MANQUANT", resultat.enseignant_id, nom,
-                                   "Le prénom de l'enseignant est manquant."))
+        anomalies.append(Anomalie(NiveauAnomalie.AVERTISSEMENT, "PRENOM_MANQUANT", resultat.enseignant_id, nom,
+                                   "Le prénom de l'enseignant est manquant.",
+                                   recommandation="Complétez la fiche dans Gestion › Enseignants si besoin."))
     if resultat.sexe not in (Sexe.HOMME, Sexe.FEMME):
         anomalies.append(Anomalie(NiveauAnomalie.ERREUR, "SEXE_INVALIDE", resultat.enseignant_id, nom,
                                    "Le sexe de l'enseignant n'est pas valide."))
@@ -184,6 +187,14 @@ def _controler_taux_et_montants(resultat: ResultatPaie) -> List[Anomalie]:
         if valeur < 0:
             anomalies.append(Anomalie(NiveauAnomalie.ERREUR, "MONTANT_NEGATIF", resultat.enseignant_id, nom,
                                        f"Le montant « {champ} » est négatif.", valeur=str(valeur)))
+
+    if resultat.net_a_percevoir < 0:
+        anomalies.append(Anomalie(
+            NiveauAnomalie.ERREUR, "NET_NEGATIF", resultat.enseignant_id, nom,
+            "Le net à payer est négatif : les retenues dépassent les gains.",
+            valeur=f"{resultat.net_a_percevoir} FCFA",
+            recommandation="Vérifiez les heures, la retenue amicale et la dette de cet enseignant.",
+        ))
 
     if (
         resultat.prime_ap_pp == 0

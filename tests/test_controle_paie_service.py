@@ -154,6 +154,8 @@ def test_controle_identite_manquante_detectee():
     codes = [a.code for a in anomalies]
     assert "NOM_MANQUANT" in codes
     assert "PRENOM_MANQUANT" in codes
+    # Un nom incomplet est signalé mais n'empêche jamais la validation (version 1.7.1).
+    assert all(a.niveau == NiveauAnomalie.AVERTISSEMENT for a in anomalies)
 
 
 # ---------------------------------------------------------------------
@@ -427,3 +429,9 @@ def test_aucune_formule_de_paie_dans_controle_paie_service():
     assert "TAUX_TAXE" not in source
     assert "taux_horaire *" not in source
     assert "gain_heures =" not in source
+
+
+def test_net_negatif_est_une_erreur_bloquante():
+    resultat = _resultat_factice(net_a_percevoir=-5000)
+    anomalies = controle_paie_service._controler_taux_et_montants(resultat)
+    assert any(a.code == "NET_NEGATIF" and a.niveau == NiveauAnomalie.ERREUR for a in anomalies)

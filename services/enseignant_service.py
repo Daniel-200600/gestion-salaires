@@ -112,7 +112,7 @@ def _construire_enseignant_valide(
     return Enseignant(
         id=enseignant_id,
         nom=valider_nom_ou_prenom(nom, "nom"),
-        prenom=valider_nom_ou_prenom(prenom, "prenom"),
+        prenom=nettoyer_texte(prenom),  # facultatif : certains noms ne comportent pas de prénom
         sexe=valider_sexe(sexe),
         statut=statut_valide,
         taux_horaire=None if salaire is not None and _vide(taux_horaire) else valider_taux_horaire(taux_horaire),
@@ -205,8 +205,7 @@ def modifier_enseignant(
     enseignant_modifie = Enseignant(
         id=existant.id,
         nom=valider_nom_ou_prenom(nom, "nom"),
-        prenom=(nettoyer_texte(prenom) if not existant.prenom and not nettoyer_texte(prenom)
-                else valider_nom_ou_prenom(prenom, "prenom")),
+        prenom=nettoyer_texte(prenom),  # facultatif
         sexe=existant.sexe if _vide(sexe) else valider_sexe(sexe),
         statut=existant.statut if _vide(statut) else valider_statut(statut),
         taux_horaire=existant.taux_horaire if _vide(taux_horaire) else valider_taux_horaire(taux_horaire),

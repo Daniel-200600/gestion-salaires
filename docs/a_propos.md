@@ -2,7 +2,13 @@
 
 Gestion des Salaires est un logiciel de gestion de la paie des enseignants : saisie des heures et des éléments de rémunération, calcul du net à payer, bulletins de solde au format Word ou PDF, états comptables, contrôle puis clôture des périodes de paie. Il fonctionne entièrement sur l'ordinateur où il est installé : aucune donnée n'est envoyée sur Internet.
 
-## Nouveautés de la version 1.7.0
+## Nouveautés de la version 1.7.1
+
+- **Un nom n'empêche plus jamais le traitement** : prénom facultatif ; nom ou prénom manquant seulement signalé par le contrôle ; ligne sans nom importée sous un nom provisoire ; bulletin produit même pour un nom composé ou un nom sans prénom.
+- **Net négatif bloqué** : un net à payer négatif (retenues supérieures aux gains) est signalé dès l'import, empêche la validation et le bulletin de l'enseignant concerné.
+- **Taux horaire nul signalé dès l'import**, au lieu d'apparaître seulement au moment de la validation.
+
+## Version 1.7.0
 
 - **Import du fichier de paie** (Paie › Import du fichier de paie) : le classeur Excel de paie du mois (heures, informations des enseignants, état comptable) est lu et chaque information placée au bon endroit ; vous complétez ou corrigez dans un tableau, puis vous validez. Les écarts entre les feuilles et avec le net du fichier sont signalés.
 - **Salaire mensuel fixe** pour les permanents payés au mois : il remplace heures × taux horaire.

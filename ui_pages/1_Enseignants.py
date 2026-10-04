@@ -84,7 +84,7 @@ with st.expander("Ajouter un enseignant", expanded=False):
             email = st.text_input("Email")
 
         with col_droite:
-            prenom = st.text_input("Prénom(s) *")
+            prenom = st.text_input("Prénom(s)")
             statut_libelle = st.selectbox("Statut *", OPTIONS_STATUT)
             salaire_fixe = st.number_input(
                 "Salaire mensuel fixe (FCFA)", min_value=0, step=1000, format="%d", value=None,
@@ -328,7 +328,7 @@ else:
                 email_modifie = st.text_input("Email", value=enseignant_selectionne.email or "")
 
             with col_droite:
-                prenom_modifie = st.text_input("Prénom(s) *", value=enseignant_selectionne.prenom)
+                prenom_modifie = st.text_input("Prénom(s)", value=enseignant_selectionne.prenom)
                 statut_modifie_libelle = st.selectbox(
                     "Statut *",
                     OPTIONS_STATUT,
