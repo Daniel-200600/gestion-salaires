@@ -89,7 +89,7 @@ def test_controle_et_bulletin_sans_taux_horaire():
     r = _paie(periode, e)
     assert not [a for a in controle_paie_service._controler_resultat(r) if a.code == "TAUX_INVALIDE"]
     valeurs = bulletin_service._preparer_valeurs_placeholder(r, periode)
-    assert valeurs["{{TAUX_HORAIRE}}"] == "" and valeurs["{{GAIN_HEURES}}"] == "150000"
+    assert valeurs["{{TAUX_HORAIRE}}"] == "" and valeurs["{{GAIN_HEURES}}"] == "150 000"
 
 
 def test_colonne_ajoutee_aux_bases_existantes(tmp_path):

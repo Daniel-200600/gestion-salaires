@@ -2,14 +2,14 @@
  {
   "page": 0,
   "rect": [
-   436.04998779296875,
-   171.94979858398438,
-   489.4769287109375,
-   184.12680053710938
+   431.20001220703125,
+   152.81776428222656,
+   494.3279724121094,
+   167.20875549316406
   ],
   "gabarit": "{PERIODE}",
   "alignement": "centre",
-  "taille": 11.0,
+  "taille": 13.0,
   "famille": "serif",
   "gras": true,
   "italique": false,
@@ -18,20 +18,20 @@
    0.0,
    0.0
   ],
-  "ligne_base": 181.75,
+  "ligne_base": 164.4,
   "texte_origine": "JULY 2026"
  },
  {
   "page": 0,
   "rect": [
-   130.25,
-   195.79977416992188,
-   214.8070068359375,
-   207.97677612304688
+   120.5999984741211,
+   180.572265625,
+   224.37449645996094,
+   195.5167694091797
   ],
   "gabarit": "{NOM_COMPLET}",
   "alignement": "centre",
-  "taille": 11.0,
+  "taille": 13.5,
   "famille": "serif",
   "gras": true,
   "italique": false,
@@ -40,20 +40,20 @@
    0.0,
    0.0
   ],
-  "ligne_base": 205.6,
+  "ligne_base": 192.6,
   "texte_origine": "NOM PRENOMS"
  },
  {
   "page": 0,
   "rect": [
-   450.25103759765625,
-   195.79977416992188,
-   458.1930236816406,
-   207.97677612304688
+   452.7330322265625,
+   180.81776428222656,
+   462.1190185546875,
+   195.20875549316406
   ],
   "gabarit": "{STATUT}",
   "alignement": "centre",
-  "taille": 11.0,
+  "taille": 13.0,
   "famille": "serif",
   "gras": true,
   "italique": false,
@@ -62,20 +62,20 @@
    0.0,
    0.0
   ],
-  "ligne_base": 205.6,
+  "ligne_base": 192.4,
   "texte_origine": "V"
  },
  {
   "page": 0,
   "rect": [
-   332.04998779296875,
-   261.6997985839844,
-   343.04998779296875,
-   273.8768005371094
+   331.79998779296875,
+   261.2543029785156,
+   343.29998779296875,
+   273.98480224609375
   ],
   "gabarit": "{TOTAL_HEURES}",
   "alignement": "centre",
-  "taille": 11.0,
+  "taille": 11.5,
   "famille": "serif",
   "gras": true,
   "italique": false,
@@ -90,14 +90,14 @@
  {
   "page": 0,
   "rect": [
-   378.75,
-   261.6997985839844,
-   400.75,
-   273.8768005371094
+   378.25,
+   261.2543029785156,
+   401.25,
+   273.98480224609375
   ],
   "gabarit": "{TAUX_HORAIRE}",
   "alignement": "centre",
-  "taille": 11.0,
+  "taille": 11.5,
   "famille": "serif",
   "gras": true,
   "italique": false,
@@ -112,14 +112,14 @@
  {
   "page": 0,
   "rect": [
-   428.20001220703125,
-   261.6997985839844,
-   455.70001220703125,
-   273.8768005371094
+   429.1000061035156,
+   260.9587707519531,
+   459.1000061035156,
+   274.2427673339844
   ],
   "gabarit": "{GAIN_HEURES}",
-  "alignement": "centre",
-  "taille": 11.0,
+  "alignement": "droite",
+  "taille": 12.0,
   "famille": "serif",
   "gras": true,
   "italique": false,
@@ -128,20 +128,20 @@
    0.0,
    0.0
   ],
-  "ligne_base": 271.5,
+  "ligne_base": 271.65,
   "texte_origine": "18000"
  },
  {
   "page": 0,
   "rect": [
-   439.20001220703125,
-   288.2497863769531,
-   444.70001220703125,
-   300.4267883300781
+   453.1000061035156,
+   290.6087951660156,
+   459.1000061035156,
+   303.8927917480469
   ],
   "gabarit": "{PRIME_AP_PP}",
-  "alignement": "centre",
-  "taille": 11.0,
+  "alignement": "droite",
+  "taille": 12.0,
   "famille": "serif",
   "gras": true,
   "italique": false,
@@ -150,20 +150,20 @@
    0.0,
    0.0
   ],
-  "ligne_base": 298.05,
+  "ligne_base": 301.3,
   "texte_origine": "0"
  },
  {
   "page": 0,
   "rect": [
-   439.20001220703125,
-   315.5497741699219,
-   444.70001220703125,
-   327.7267761230469
+   453.1000061035156,
+   320.6087951660156,
+   459.1000061035156,
+   333.8927917480469
   ],
   "gabarit": "{SURVEILLANCE_SECRETARIAT}",
-  "alignement": "centre",
-  "taille": 11.0,
+  "alignement": "droite",
+  "taille": 12.0,
   "famille": "serif",
   "gras": true,
   "italique": false,
@@ -172,20 +172,20 @@
    0.0,
    0.0
   ],
-  "ligne_base": 325.35,
+  "ligne_base": 331.3,
   "texte_origine": "0"
  },
  {
   "page": 0,
   "rect": [
-   439.20001220703125,
-   342.8497619628906,
-   444.70001220703125,
-   355.0267639160156
+   453.1000061035156,
+   350.6087951660156,
+   459.1000061035156,
+   363.8927917480469
   ],
   "gabarit": "{INDEMNITE_SUGGESTION_ADMIN}",
-  "alignement": "centre",
-  "taille": 11.0,
+  "alignement": "droite",
+  "taille": 12.0,
   "famille": "serif",
   "gras": true,
   "italique": false,
@@ -194,20 +194,20 @@
    0.0,
    0.0
   ],
-  "ligne_base": 352.65,
+  "ligne_base": 361.3,
   "texte_origine": "0"
  },
  {
   "page": 0,
   "rect": [
-   506.75,
-   370.1497802734375,
-   523.25,
-   382.3267822265625
+   534.9500122070312,
+   380.6087951660156,
+   552.9500122070312,
+   393.8927917480469
   ],
   "gabarit": "{TAXE}",
-  "alignement": "centre",
-  "taille": 11.0,
+  "alignement": "droite",
+  "taille": 12.0,
   "famille": "serif",
   "gras": true,
   "italique": false,
@@ -216,20 +216,20 @@
    0.0,
    0.0
   ],
-  "ligne_base": 379.95,
+  "ligne_base": 391.3,
   "texte_origine": "990"
  },
  {
   "page": 0,
   "rect": [
-   512.25,
-   397.44976806640625,
-   517.75,
-   409.62677001953125
+   546.9500122070312,
+   410.6087951660156,
+   552.9500122070312,
+   423.8927917480469
   ],
   "gabarit": "{RETENUE_AMICALE}",
-  "alignement": "centre",
-  "taille": 11.0,
+  "alignement": "droite",
+  "taille": 12.0,
   "famille": "serif",
   "gras": true,
   "italique": false,
@@ -238,20 +238,20 @@
    0.0,
    0.0
   ],
-  "ligne_base": 407.25,
+  "ligne_base": 421.3,
   "texte_origine": "0"
  },
  {
   "page": 0,
   "rect": [
-   512.25,
-   424.7497863769531,
-   517.75,
-   436.9267883300781
+   546.9500122070312,
+   440.6087951660156,
+   552.9500122070312,
+   453.8927917480469
   ],
   "gabarit": "{DETTE}",
-  "alignement": "centre",
-  "taille": 11.0,
+  "alignement": "droite",
+  "taille": 12.0,
   "famille": "serif",
   "gras": true,
   "italique": false,
@@ -260,20 +260,20 @@
    0.0,
    0.0
   ],
-  "ligne_base": 434.55,
+  "ligne_base": 451.3,
   "texte_origine": "0"
  },
  {
   "page": 0,
   "rect": [
-   402.1000061035156,
-   453.6497802734375,
-   429.6000061035156,
-   465.8267822265625
+   427.8500061035156,
+   467.6132507324219,
+   459.1000061035156,
+   481.4507751464844
   ],
   "gabarit": "{TOTAL_GAINS}",
-  "alignement": "centre",
-  "taille": 11.0,
+  "alignement": "droite",
+  "taille": 12.5,
   "famille": "serif",
   "gras": true,
   "italique": false,
@@ -282,20 +282,20 @@
    0.0,
    0.0
   ],
-  "ligne_base": 463.45,
+  "ligne_base": 478.75,
   "texte_origine": "18000"
  },
  {
   "page": 0,
   "rect": [
-   506.75,
-   453.6497802734375,
-   523.25,
-   465.8267822265625
+   534.2000122070312,
+   467.6132507324219,
+   552.9500122070312,
+   481.4507751464844
   ],
   "gabarit": "{TOTAL_RETENUES}",
-  "alignement": "centre",
-  "taille": 11.0,
+  "alignement": "droite",
+  "taille": 12.5,
   "famille": "serif",
   "gras": true,
   "italique": false,
@@ -304,20 +304,20 @@
    0.0,
    0.0
   ],
-  "ligne_base": 463.45,
+  "ligne_base": 478.75,
   "texte_origine": "990"
  },
  {
   "page": 0,
   "rect": [
-   217.10000610351562,
-   468.59075927734375,
-   324.239990234375,
-   479.6607666015625
+   214.39999389648438,
+   496.145263671875,
+   326.8760986328125,
+   507.7687683105469
   ],
   "gabarit": "{NET_EN_LETTRES}",
   "alignement": "centre",
-  "taille": 10.0,
+  "taille": 10.5,
   "famille": "serif",
   "gras": true,
   "italique": false,
@@ -326,20 +326,20 @@
    0.0,
    0.0
   ],
-  "ligne_base": 477.5,
+  "ligne_base": 505.5,
   "texte_origine": "Seventeen Thousand Ten"
  },
  {
   "page": 0,
   "rect": [
-   475.1000061035156,
-   468.0497741699219,
-   502.6000061035156,
-   480.2267761230469
+   468.8500061035156,
+   493.2447509765625,
+   508.8500061035156,
+   510.9567565917969
   ],
   "gabarit": "{NET_A_PAYER}",
   "alignement": "centre",
-  "taille": 11.0,
+  "taille": 16.0,
   "famille": "serif",
   "gras": true,
   "italique": false,
@@ -348,7 +348,7 @@
    0.0,
    0.0
   ],
-  "ligne_base": 477.85,
+  "ligne_base": 507.5,
   "texte_origine": "17010"
  }
 ]

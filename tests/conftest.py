@@ -44,3 +44,11 @@ def taux_de_taxe_historique(request, monkeypatch):
     from services import parametres_paie_service
 
     monkeypatch.setattr(parametres_paie_service, "TAUX_TAXE", Decimal("0.05"))
+
+
+@pytest.fixture(autouse=True)
+def documents_produits_dans_un_dossier_temporaire(tmp_path, monkeypatch):
+    """Aucun test n'écrit jamais de bulletin dans le dossier réel des documents."""
+    from services import bulletin_service
+
+    monkeypatch.setattr(bulletin_service, "EXPORT_DIR_BULLETINS", tmp_path / "bulletins_produits")

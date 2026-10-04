@@ -176,8 +176,14 @@ if alertes:
             "Période": periodes_par_id[a.periode_id].libelle if a.periode_id in periodes_par_id else "—",
             "Statut": a.statut.value, "Résolue par": a.resolue_par or "—",
         })
+    tampon_brut = BytesIO()
+    pd.DataFrame(lignes_export).to_excel(tampon_brut, index=False, engine="openpyxl")
+    from openpyxl import load_workbook
+
+    from exports.logo_excel import ajouter_logo
+
     tampon = BytesIO()
-    pd.DataFrame(lignes_export).to_excel(tampon, index=False, engine="openpyxl")
+    ajouter_logo(load_workbook(tampon_brut)).save(tampon)
     st.download_button(
         "Télécharger (Excel)", data=tampon.getvalue(), file_name="alertes_export.xlsx",
         mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",

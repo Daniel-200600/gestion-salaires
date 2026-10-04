@@ -38,6 +38,7 @@ from services.parametres_paie_service import (
     taux_vers_pourcentage,
 )
 from services import administration_service
+from services import administration_periode_service as admin_periode
 from services.autorisation_service import AutorisationRefuseeError
 from utils.session_auth import exiger_permission, utilisateur_courant_id, utilisateur_courant_role
 
@@ -52,6 +53,8 @@ peut_supprimer_periode = permission_service.a_permission(role_courant, permissio
 peut_regler_taux = permission_service.a_permission(role_courant, permission_service.PARAMETRES_PAIE_GERER)
 
 st.title("Gestion des périodes de paie")
+if (message_action := st.session_state.pop("message_action_periode", None)) is not None:
+    st.success(message_action)
 
 ANNEE_COURANTE = date.today().year  # valeur par défaut raisonnable pour le formulaire ; l'utilisateur peut la changer
 
@@ -225,79 +228,62 @@ else:
     st.divider()
 
     # ===================================================================
-    # Zone 4 — Suppression définitive (irréversible, fortement restreinte)
+    # Zone 4 — Actions d'administrateur : rouvrir (invalider) ou supprimer
     # ===================================================================
-    st.subheader("Suppression définitive")
-
-    dependances_periode = obtenir_dependances_periode(periode_id)
-    st.markdown(
-        f"- {dependances_periode.nombre_heures} saisie(s) d'heures\n"
-        f"- {dependances_periode.nombre_elements_remuneration} élément(s) de rémunération\n"
-        f"- {dependances_periode.nombre_retenues} retenue(s)\n"
-        f"- {'Oui' if dependances_periode.a_des_bulletins else 'Aucun'} bulletin généré"
-    )
-
-    texte_confirmation_attendu = f"SUPPRIMER {periode_selectionnee.libelle.upper()}"
-    cle_confirmation_periode = f"confirmation_suppression_periode_{periode_id}"
-
-    if dependances_periode.a_des_bulletins:
-        # Un bulletin existe : la règle ne peut jamais être contournée
-        # depuis l'interface — aucun bouton de suppression n'est affiché.
-        st.error(
-            "Suppression définitive impossible : cette période possède un ou plusieurs bulletins "
-            "de paie. La période doit être conservée afin de préserver l'historique."
-        )
-    elif periode_selectionnee.statut != StatutPeriode.BROUILLON:
-        st.error(
-            "Suppression définitive impossible : seule une période encore au statut **Brouillon** "
-            "peut être supprimée définitivement. Les périodes Ouverte, Validée ou Clôturée sont "
-            "conservées afin de préserver l'historique de paie."
-        )
+    st.subheader("Rouvrir ou supprimer la période")
+    if not peut_supprimer_periode:
+        st.caption("Réservé aux administrateurs.")
     else:
-        if dependances_periode.a_des_donnees_de_paie:
-            st.warning(
-                "Cette période possède des données de paie sans bulletin généré. "
-                "Elles seront supprimées avec elle."
-            )
+        dependances_periode = obtenir_dependances_periode(periode_id)
+        st.caption(
+            f"Données de la période : {dependances_periode.nombre_heures} saisie(s) d'heures, "
+            f"{dependances_periode.nombre_elements_remuneration} élément(s) de rémunération, "
+            f"{dependances_periode.nombre_retenues} retenue(s), "
+            f"{'des' if dependances_periode.a_des_bulletins else 'aucun'} bulletin(s) enregistré(s). "
+            "Une sauvegarde de la base est créée automatiquement avant chaque action ; chaque action est "
+            "inscrite au journal d'audit."
+        )
+        col_rouvrir, col_supprimer = st.columns(2)
 
-        if not st.session_state.get(cle_confirmation_periode, False):
-            if st.button("Supprimer définitivement cette période", type="primary"):
-                st.session_state[cle_confirmation_periode] = True
-                st.rerun()
-        else:
-            st.error(
-                "ATTENTION — Vous êtes sur le point de supprimer définitivement :\n\n"
-                f"**Période : {periode_selectionnee.libelle}**\n\n"
-                "Cette opération supprimera également les données de paie qui en dépendent "
-                "(lorsque leur suppression est autorisée). **Cette opération est irréversible.**"
+        with col_rouvrir:
+            st.markdown("**Rouvrir (invalider) la période**")
+            if periode_selectionnee.statut in (StatutPeriode.VALIDEE, StatutPeriode.CLOTUREE):
+                st.caption(
+                    "La période redevient ouverte : ses données redeviennent modifiables. Après correction, "
+                    "validez-la de nouveau et produisez les bulletins."
+                )
+                with st.form(f"form_rouvrir_{periode_id}"):
+                    motif = st.text_input("Motif (facultatif)")
+                    confirmation_r = st.text_input(f"Tapez « {periode_selectionnee.libelle} » pour confirmer")
+                    if st.form_submit_button("Rouvrir la période"):
+                        try:
+                            rapport = admin_periode.rouvrir_periode(
+                                utilisateur_courant_id(), periode_id, confirmation_r, motif=motif
+                            )
+                            st.session_state["message_action_periode"] = (
+                                f"{rapport.libelle} est de nouveau ouverte. Sauvegarde préalable : {rapport.sauvegarde.name}."
+                            )
+                            st.rerun()
+                        except (admin_periode.AdministrationPeriodeError, AutorisationRefuseeError) as erreur:
+                            st.error(str(erreur))
+            else:
+                st.caption("Disponible pour une période validée ou clôturée.")
+
+        with col_supprimer:
+            st.markdown("**Supprimer la période**")
+            st.caption(
+                "Supprime la période, quel que soit son statut, avec ses heures, primes, retenues et bulletins "
+                "enregistrés. Les fiches des enseignants sont conservées."
             )
-            saisie_confirmation_periode = st.text_input(
-                f"Tapez **{texte_confirmation_attendu}** pour confirmer",
-                key=f"saisie_confirmation_periode_{periode_id}",
-            )
-            col_confirmer_p, col_annuler_p = st.columns(2)
-            with col_confirmer_p:
-                confirmation_periode_valide = saisie_confirmation_periode.strip() == texte_confirmation_attendu
-                if st.button(
-                    "Confirmer la suppression",
-                    type="primary",
-                    disabled=not confirmation_periode_valide,
-                    key=f"bouton_confirmer_periode_{periode_id}",
-                ):
+            with st.form(f"form_supprimer_{periode_id}"):
+                confirmation_s = st.text_input(f"Tapez « {periode_selectionnee.libelle} » pour confirmer")
+                if st.form_submit_button("Supprimer la période", type="primary"):
                     try:
-                        # Droits revérifiés en base par le service (ADMIN uniquement).
-                        administration_service.supprimer_periode(
-                            utilisateur_courant_id(), periode_id, confirmation=True
+                        rapport = admin_periode.supprimer_periode(utilisateur_courant_id(), periode_id, confirmation_s)
+                        st.session_state["message_action_periode"] = (
+                            f"La période {rapport.libelle} a été supprimée ({rapport.nb_saisies_heures} saisie(s) "
+                            f"d'heures). Sauvegarde préalable : {rapport.sauvegarde.name} (Administration › Restauration)."
                         )
-                        st.session_state.pop(cle_confirmation_periode, None)
-                        st.success(f"La période « {periode_selectionnee.libelle} » a été supprimée définitivement.")
                         st.rerun()
-                    except (PeriodeValidationError, AutorisationRefuseeError) as erreur:
-                        st.session_state.pop(cle_confirmation_periode, None)
+                    except (admin_periode.AdministrationPeriodeError, AutorisationRefuseeError) as erreur:
                         st.error(str(erreur))
-                if saisie_confirmation_periode and not confirmation_periode_valide:
-                    st.caption("Le texte saisi ne correspond pas exactement au texte demandé.")
-            with col_annuler_p:
-                if st.button("Annuler", key=f"bouton_annuler_periode_{periode_id}"):
-                    st.session_state.pop(cle_confirmation_periode, None)
-                    st.rerun()

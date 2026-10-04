@@ -7,6 +7,7 @@ paie, aucune logique métier — uniquement des exemples illustratifs.
 from pathlib import Path
 
 from openpyxl import Workbook
+from exports.logo_excel import ajouter_logo
 from openpyxl.styles import Font, PatternFill
 from openpyxl.utils import get_column_letter
 
@@ -82,7 +83,7 @@ def generer_classeur_modele(type_import: TypeImport) -> Workbook:
         feuille_instructions.cell(row=i, column=1, value=f"• {ligne_instruction}")
     feuille_instructions.column_dimensions["A"].width = 90
 
-    return classeur
+    return ajouter_logo(classeur)
 
 
 def generer_fichier_modele(type_import: TypeImport, dossier: Path) -> Path:
@@ -152,4 +153,4 @@ def generer_classeur_fiches_a_completer(enseignants) -> Workbook:
     for i, ligne_instruction in enumerate(instructions, start=3):
         feuille_instructions.cell(row=i, column=1, value=f"• {ligne_instruction}")
     feuille_instructions.column_dimensions["A"].width = 110
-    return classeur
+    return ajouter_logo(classeur)

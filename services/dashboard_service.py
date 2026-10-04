@@ -290,5 +290,7 @@ def exporter_consultation_excel(
         nom_fichier = f"Consultation_Paie_{libelle_nettoye}.xlsx"
 
     chemin = chemin_sortie_disponible(nom_fichier, dossier=EXPORT_DIR)
-    classeur.save(chemin)
+    from exports.logo_excel import ajouter_logo  # import local : la couche export ne dépend pas des services
+
+    ajouter_logo(classeur).save(chemin)
     return chemin

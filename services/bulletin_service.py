@@ -99,6 +99,11 @@ def _formater_heures(valeur: float) -> str:
     return f"{valeur:g}"
 
 
+def montant_bulletin(valeur: int) -> str:
+    """Montant écrit avec séparateur de milliers, pour une lecture claire : 71400 -> « 71 400 »."""
+    return f"{int(valeur):,}".replace(",", " ")
+
+
 def _preparer_valeurs_placeholder(resultat: ResultatPaie, periode: Union[PeriodePaie, str]) -> Dict[str, str]:
     """
     Construit le dict {balise: valeur texte} à partir d'un ResultatPaie
@@ -141,19 +146,19 @@ def _preparer_valeurs_placeholder(resultat: ResultatPaie, periode: Union[Periode
         "SEMAINE_4": _formater_heures(resultat.semaine_4),
         "SEMAINE_5": _formater_heures(resultat.semaine_5),
         # Permanent au salaire fixe : pas de taux horaire, le gain est le salaire du mois.
-        "TAUX_HORAIRE": "" if resultat.salaire_fixe is not None else str(resultat.taux_horaire),
-        "GAIN_HEURES": str(resultat.gain_heures),
-        "PRIME_AP_PP": str(resultat.prime_ap_pp),
-        "SURVEILLANCE_SECRETARIAT": str(resultat.surveillance_secretariat),
-        "INDEMNITE_SUGGESTION_ADMIN": str(resultat.indemnite_suggestion_admin),
-        "TOTAL_GAINS": str(total_gains),
-        "BASE_TAXABLE": str(resultat.base_taxable),
-        "TAXE": str(resultat.taxe_5),
+        "TAUX_HORAIRE": "" if resultat.salaire_fixe is not None else montant_bulletin(resultat.taux_horaire),
+        "GAIN_HEURES": montant_bulletin(resultat.gain_heures),
+        "PRIME_AP_PP": montant_bulletin(resultat.prime_ap_pp),
+        "SURVEILLANCE_SECRETARIAT": montant_bulletin(resultat.surveillance_secretariat),
+        "INDEMNITE_SUGGESTION_ADMIN": montant_bulletin(resultat.indemnite_suggestion_admin),
+        "TOTAL_GAINS": montant_bulletin(total_gains),
+        "BASE_TAXABLE": montant_bulletin(resultat.base_taxable),
+        "TAXE": montant_bulletin(resultat.taxe_5),
         "TAXE_TAUX": formater_taux(resultat.taux_taxe),
-        "RETENUE_AMICALE": str(resultat.retenue_amicale),
-        "DETTE": str(resultat.dette),
-        "TOTAL_RETENUES": str(total_retenues),
-        "NET_A_PAYER": str(resultat.net_a_percevoir),
+        "RETENUE_AMICALE": montant_bulletin(resultat.retenue_amicale),
+        "DETTE": montant_bulletin(resultat.dette),
+        "TOTAL_RETENUES": montant_bulletin(total_retenues),
+        "NET_A_PAYER": montant_bulletin(resultat.net_a_percevoir),
         "NET_EN_LETTRES": montant_en_lettres(resultat.net_a_percevoir),
     }
     valeurs["TAXE_5"] = valeurs["TAXE"]
@@ -238,7 +243,7 @@ def _valider_bulletin_genere(chemin: Path, resultat: ResultatPaie, libelle_perio
         except PdfExportError as erreur:
             _echec(f"le fichier PDF généré n'est pas un document valide ({erreur}).")
             return
-        if str(resultat.net_a_percevoir) not in contenu:
+        if montant_bulletin(resultat.net_a_percevoir) not in contenu and str(resultat.net_a_percevoir) not in contenu:
             _echec("le net à payer n'apparaît pas dans le bulletin PDF.")
     else:
         try:
@@ -250,11 +255,7 @@ def _valider_bulletin_genere(chemin: Path, resultat: ResultatPaie, libelle_perio
     if "{{" in contenu or "}}" in contenu:
         _echec("un placeholder non remplacé subsiste dans le document.")
 
-    # Comparaison sur le nom tel qu'il est écrit dans le nom de fichier (espaces et caractères interdits
-    # remplacés par « _ ») : un nom composé ou avec apostrophe ne fait jamais échouer le bulletin.
-    nom_dans_fichier = nettoyer_nom_fichier((resultat.nom or "").upper())
-    if (resultat.nom or "").strip() and nom_dans_fichier.upper() not in chemin.name.upper():
-        _echec("le nom du fichier ne correspond pas à l'enseignant du bulletin.")
+    # Le nom du fichier n'intervient jamais dans la validité d'un bulletin (version 1.8.0).
 
 
 def generer_bulletin_enseignant(
@@ -420,8 +421,8 @@ def bulletin_deja_genere(nom: str, prenom: str, libelle_periode: str) -> bool:
     enseignant sur cette période, en relisant les noms de fichiers du
     dossier d'export (aucune génération, aucun accès base).
     """
-    nom_nettoye = nettoyer_nom_fichier(nom.upper())
-    prenom_nettoye = nettoyer_nom_fichier(prenom.upper())
+    nom_nettoye = nettoyer_nom_fichier((nom or "").upper())
+    prenom_nettoye = nettoyer_nom_fichier(prenom.upper()) if (prenom or "").strip() else ""
     for chemin in lister_bulletins_existants(libelle_periode):
         nom_fichier = chemin.stem.upper()
         if nom_nettoye in nom_fichier and prenom_nettoye in nom_fichier:

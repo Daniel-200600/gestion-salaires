@@ -364,6 +364,12 @@ def verifier_lignes(lignes: List[dict], periode_id: int, db_path: DbPath = None)
     existants = enseignant_repository.lister(inclure_inactifs=True, db_path=db_path)
     par_cle = {_cle_identite(e.nom, e.prenom): e for e in existants}
     vus: Dict[tuple, int] = {}
+    # Fiches reconnues exactement par une ligne : jamais rapprochées d'une autre ligne.
+    pris = {
+        par_cle[cle].id for cle in (
+            _cle_identite(nettoyer_texte(str(l.get("nom_complet") or "")), "") for l in lignes if l.get("importer", True)
+        ) if cle in par_cle
+    }
     resultat = []
     for donnees_brutes in lignes:
         donnees = {colonne: _valeur_ou_none(donnees_brutes.get(colonne)) for colonne in COLONNES}
@@ -378,11 +384,39 @@ def verifier_lignes(lignes: List[dict], periode_id: int, db_path: DbPath = None)
         resultat.append(ligne)
         if not donnees["importer"]:
             continue
-        _verifier_ligne(ligne, par_cle, existants, vus, periode)
+        _verifier_ligne(ligne, par_cle, existants, vus, periode, pris)
     return resultat
 
 
-def _verifier_ligne(ligne: LigneVerifiee, par_cle, existants, vus, periode) -> None:
+def _rapprocher(ligne: LigneVerifiee, cle: tuple, par_cle, existants, pris: set) -> Optional[Enseignant]:
+    """
+    Fiche de l'application correspondant au nom du fichier : mêmes mots dans
+    n'importe quel ordre ; à défaut, UN SEUL nom très proche (prénom en plus
+    ou en moins, faute de frappe), signalé pour vérification.
+    """
+    existant = par_cle.get(cle)
+    if existant is not None:
+        return existant
+    candidats = [e for e in existants if e.id not in pris
+                 and _sont_probablement_la_meme_personne(cle, _cle_identite(e.nom, e.prenom))]
+    if len(candidats) == 1:
+        existant = candidats[0]
+        pris.add(existant.id)
+        ligne.remarques.append(
+            f"Rapproché de la fiche « {' '.join((existant.nom + ' ' + existant.prenom).split())} » (nom écrit "
+            "autrement) : vérifiez qu'il s'agit bien du même enseignant."
+        )
+        return existant
+    if candidats:
+        ligne.remarques.append(
+            "Plusieurs fiches ont un nom proche (" + ", ".join(f"« {' '.join((e.nom + ' ' + e.prenom).split())} »"
+                                                       for e in candidats[:3])
+            + ") : une nouvelle fiche sera créée, vérifiez qu'il ne s'agit pas de l'une d'elles."
+        )
+    return None
+
+
+def _verifier_ligne(ligne: LigneVerifiee, par_cle, existants, vus, periode, pris: set) -> None:
     d = ligne.donnees
     nom_complet = nettoyer_texte(str(d.get("nom_complet") or ""))
     if not nom_complet:
@@ -402,7 +436,7 @@ def _verifier_ligne(ligne: LigneVerifiee, par_cle, existants, vus, periode) -> N
         ligne.erreurs.append("Sexe manquant ou illisible (M ou F).")
     if statut is None:
         ligne.erreurs.append("Statut manquant ou illisible (V ou P).")
-    existant = par_cle.get(cle)
+    existant = _rapprocher(ligne, cle, par_cle, existants, pris)
     taux, salaire = _remuneration_effective(d, statut, existant)
     if taux is not None and taux < 0 or salaire is not None and salaire < 0:
         ligne.erreurs.append("Montant négatif.")
@@ -430,14 +464,12 @@ def _verifier_ligne(ligne: LigneVerifiee, par_cle, existants, vus, periode) -> N
             ligne.erreurs.append("Montant négatif.")
         montants[champ] = montant
 
-    if existant is None:
-        proche = next((e for e in existants if _sont_probablement_la_meme_personne(cle, _cle_identite(e.nom, e.prenom))),
-                      None)
-        if proche is not None:
-            ligne.remarques.append(f"Nom proche d'un enseignant déjà enregistré (« {proche.nom} {proche.prenom} ») : "
-                                   "une nouvelle fiche sera créée, vérifiez qu'il ne s'agit pas du même.")
-    else:
+    if existant is not None:
         ligne.enseignant_existant = existant
+        nom_fichier, prenom_fichier = _nom_et_prenom(nom_complet)
+        if not (existant.prenom or "").strip() and prenom_fichier:
+            ligne.modifications.append(f"Nom et prénom : « {existant.nom} » → nom « {nom_fichier} », "
+                                       f"prénom « {prenom_fichier} »")
         if not existant.actif:
             ligne.erreurs.append("Enseignant désactivé : réactivez-le dans Gestion › Enseignants, ou décochez la ligne.")
         for libelle, avant, apres in (
@@ -579,20 +611,27 @@ def _remuneration_effective(d: dict, statut, existant: Optional[Enseignant]) -> 
     return taux, salaire
 
 
+def _nom_et_prenom(nom_complet: str) -> Tuple[str, str]:
+    if str(nom_complet).startswith(nom_provisoire(None)):  # nom provisoire gardé entier
+        return str(nom_complet), ""
+    return separer_nom_complet(str(nom_complet))
+
+
 def _fiche(ligne: LigneVerifiee) -> Enseignant:
     d = ligne.donnees
     existant = ligne.enseignant_existant
-    nom, prenom = separer_nom_complet(str(d["nom_complet"]))
-    if str(d["nom_complet"]).startswith(nom_provisoire(None)):  # nom provisoire gardé entier
-        nom, prenom = str(d["nom_complet"]), ""
+    nom, prenom = _nom_et_prenom(d["nom_complet"])
     statut = interpreter_statut(str(d["statut"]))
     taux, salaire = _remuneration_effective(d, statut, existant)
     if existant is None:
         return Enseignant(nom=nom, prenom=prenom, sexe=interpreter_sexe(str(d["sexe"])), statut=statut,
                           taux_horaire=taux, salaire_fixe=salaire)
-    # Fiche existante : le nom enregistré est conservé ; une case vide ne retire rien.
+    # Fiche existante : le nom enregistré est conservé (une case vide ne retire rien), sauf si la
+    # fiche n'a pas de prénom : nom et prénom sont alors repris du fichier.
+    if (existant.prenom or "").strip() or not prenom:
+        nom, prenom = existant.nom, existant.prenom
     return Enseignant(
-        id=existant.id, nom=existant.nom, prenom=existant.prenom, sexe=interpreter_sexe(str(d["sexe"])),
+        id=existant.id, nom=nom, prenom=prenom, sexe=interpreter_sexe(str(d["sexe"])),
         statut=statut, taux_horaire=taux, salaire_fixe=salaire,
         email=existant.email, telephone=existant.telephone, adresse=existant.adresse, actif=existant.actif,
     )

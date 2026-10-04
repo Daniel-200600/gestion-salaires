@@ -20,6 +20,7 @@ from pathlib import Path
 from typing import List, Optional
 
 from openpyxl import Workbook
+from exports.logo_excel import ajouter_logo
 from openpyxl.utils import get_column_letter
 from openpyxl.worksheet.worksheet import Worksheet
 
@@ -245,7 +246,7 @@ def generer_classeur_etat_paie(
     if comparaison is not None:
         _feuille_comparaison(classeur, comparaison)
 
-    return classeur
+    return ajouter_logo(classeur)
 
 
 def generer_nom_fichier_etat_paie(rapport: EtatPaieComplet) -> str:

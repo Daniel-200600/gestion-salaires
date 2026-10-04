@@ -106,4 +106,4 @@ Fonctions du logiciel utiles pour répondre à une demande :
 
 ## 10. Évolution de ce document
 
-Ce document doit être mis à jour lorsque le fonctionnement du logiciel ou l'organisation de l'établissement change. Version du logiciel décrite : 1.7.1. [Date de validation par l'établissement, à compléter.]
+Ce document doit être mis à jour lorsque le fonctionnement du logiciel ou l'organisation de l'établissement change. Version du logiciel décrite : 1.8.0. [Date de validation par l'établissement, à compléter.]

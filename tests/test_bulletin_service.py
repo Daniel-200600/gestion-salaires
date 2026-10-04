@@ -128,14 +128,15 @@ def test_toutes_les_valeurs_financieres_injectees():
     texte = _lire_texte_document(resultat.chemin)
 
     assert str(resultat_moteur.total_heures).rstrip("0").rstrip(".") in texte or "100" in texte
-    assert "2000" in texte  # taux horaire
-    assert "200000" in texte  # gain heures
-    assert "20000" in texte  # prime ap/pp
-    assert "10000" in texte  # surveillance
-    assert "5000" in texte  # indemnite (et retenue amicale, valeur identique)
-    assert "11750" in texte  # taxe
-    assert "10000" in texte  # dette
-    assert "208250" in texte  # net
+    # Montants écrits avec séparateur de milliers (version 1.8.0).
+    assert "2 000" in texte  # taux horaire
+    assert "200 000" in texte  # gain heures
+    assert "20 000" in texte  # prime ap/pp
+    assert "10 000" in texte  # surveillance
+    assert "5 000" in texte  # indemnite (et retenue amicale, valeur identique)
+    assert "11 750" in texte  # taxe
+    assert "10 000" in texte  # dette
+    assert "208 250" in texte  # net
 
 
 # ---------------------------------------------------------------------

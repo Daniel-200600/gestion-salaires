@@ -81,4 +81,4 @@ Le logiciel peut être modifié pour corriger des anomalies ou faire évoluer se
 
 Pour toute question sur l'utilisation du logiciel, un compte ou une anomalie : [service ou personne à contacter et coordonnées, à compléter par l'établissement].
 
-Version du logiciel décrite : 1.7.1. [Date d'entrée en vigueur, à compléter.]
+Version du logiciel décrite : 1.8.0. [Date d'entrée en vigueur, à compléter.]

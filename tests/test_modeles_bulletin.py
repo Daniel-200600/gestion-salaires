@@ -156,7 +156,7 @@ def test_bulletin_genere_en_word_avec_mois_en_anglais_et_montants_bruts():
     texte = _texte_docx(resultat.chemin)
     assert "JULY 2026" in texte
     assert "MBARGA" in texte and "ÉLISE" in texte and "Statut: V" in texte
-    assert "18000" in texte and "900" in texte  # 5 % par défaut, montants sans séparateur
+    assert "18 000" in texte and "900" in texte  # 5 %, montants avec séparateur de milliers (version 1.8.0)
     assert "Seventeen Thousand One Hundred" in texte  # 17 100
 
 
@@ -183,8 +183,8 @@ def test_bulletin_pdf_avec_modele_standard(tmp_path):
     assert resultat.chemin.suffix == ".pdf"
     texte = pdf_export.texte_pdf(resultat.chemin.read_bytes())
     assert "Statut:" in texte and "\nV\n" in texte  # statut réécrit à droite de « Statut: »
-    for valeur in ("MBARGA ÉLISE", "JULY 2026", "200000", "35000", "11750", "15000", "235000",
-                   "26750", "208250", "Two Hundred Eight Thousand Two Hundred Fifty"):
+    for valeur in ("MBARGA ÉLISE", "JULY 2026", "200 000", "35 000", "11 750", "15 000", "235 000",
+                   "26 750", "208 250", "Two Hundred Eight Thousand Two Hundred Fifty"):
         assert valeur in texte, valeur
     assert "NOM PRENOMS" not in texte and "17010" not in texte  # valeurs d'exemple effacées
     assert "{{" not in texte
@@ -209,7 +209,7 @@ def test_import_word_a_balises_et_generation():
     assert modele.chemin.exists() and modele.format == "docx"
     e, p = _periode_validee_avec_enseignant()
     texte = _texte_docx(bulletin_service.generer_bulletin_enseignant(p.id, e.id).chemin)
-    assert "MBARGA ÉLISE" in texte and "17100" in texte and "JULY 2026" in texte and "900" in texte
+    assert "MBARGA ÉLISE" in texte and "17 100" in texte and "JULY 2026" in texte and "900" in texte
 
 
 def test_import_pdf_a_balises_alignements_et_texte_fixe():
@@ -222,7 +222,7 @@ def test_import_pdf_a_balises_alignements_et_texte_fixe():
     e, p = _periode_validee_avec_enseignant(statut="P")
     texte = pdf_export.texte_pdf(bulletin_service.generer_bulletin_enseignant(p.id, e.id).chemin.read_bytes())
     # Permanent : aucune taxe, net = 10 h × 1 800 FCFA.
-    assert "Statut: P" in texte and "MBARGA ÉLISE" in texte and "18000" in texte and "{{" not in texte
+    assert "Statut: P" in texte and "MBARGA ÉLISE" in texte and "18 000" in texte and "{{" not in texte
 
 
 def test_balises_historiques_acceptees():
@@ -258,7 +258,7 @@ def test_bulletin_word_rempli_detecte_et_converti():
     assert set(balises) == STANDARD
     e, p = _periode_validee_avec_enseignant()
     texte = _texte_docx(bulletin_service.generer_bulletin_enseignant(p.id, e.id).chemin)
-    assert "MBARGA ÉLISE" in texte and "Statut: V" in texte and "17100" in texte and "NOM PRENOMS" not in texte
+    assert "MBARGA ÉLISE" in texte and "Statut: V" in texte and "17 100" in texte and "NOM PRENOMS" not in texte
 
 
 def test_bulletin_pdf_rempli_detecte_et_reproduit():
@@ -270,7 +270,7 @@ def test_bulletin_pdf_rempli_detecte_et_reproduit():
     )
     e, p = _periode_validee_avec_enseignant()
     texte = pdf_export.texte_pdf(bulletin_service.generer_bulletin_enseignant(p.id, e.id).chemin.read_bytes())
-    assert "MBARGA ÉLISE" in texte and "17100" in texte and "Seventeen Thousand One Hundred" in texte
+    assert "MBARGA ÉLISE" in texte and "17 100" in texte and "Seventeen Thousand One Hundred" in texte
 
 
 def test_modele_pdf_enregistre_sans_les_valeurs_d_origine():

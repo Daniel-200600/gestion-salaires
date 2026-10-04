@@ -11,7 +11,7 @@
 ; désinstallation ne les touche pas.
 
 #define NomApp "Gestion des Salaires"
-#define VersionApp "1.7.1"
+#define VersionApp "1.8.0"
 #define Editeur "Daniel Tchomtchi"
 #define Exe "GestionPaie.exe"
 

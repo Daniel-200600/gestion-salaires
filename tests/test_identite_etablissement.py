@@ -182,3 +182,20 @@ def test_modele_pdf_de_l_etablissement_avec_libreoffice(monkeypatch):
     assert "COLLEGE BILINGUE EXEMPLE" in texte and "Douala" in texte
     assert modele_bulletin_service.modele_standard_pdf().chemin == rapport.modele_pdf
     modele_bulletin_service.apercu_modele(modele_bulletin_service.modele_standard_pdf())
+
+
+def test_mise_en_page_anterieure_refaite_au_demarrage():
+    _enregistrer()
+    dossier = settings.MODELES_ETABLISSEMENT_DIR
+    marqueur = dossier / build_template.NOM_FICHIER_VERSION
+    assert marqueur.read_text(encoding="utf-8") == build_template.VERSION_MISE_EN_PAGE
+    assert service.assurer_modeles_etablissement() is None  # déjà à jour : rien n'est refait
+
+    # Poste mis à jour : modèles de la mise en page précédente, PDF produit autrefois avec LibreOffice.
+    marqueur.write_text("1", encoding="utf-8")
+    ancien_pdf = dossier / build_template.CHEMIN_MODELE_PDF.name
+    ancien_pdf.write_bytes(b"%PDF ancien modele de l'etablissement")
+    rapport = service.assurer_modeles_etablissement()
+    assert rapport is not None and marqueur.read_text(encoding="utf-8") == build_template.VERSION_MISE_EN_PAGE
+    # Sans LibreOffice, le PDF de l'établissement est conservé (il garde son en-tête).
+    assert ancien_pdf.read_bytes() == b"%PDF ancien modele de l'etablissement"

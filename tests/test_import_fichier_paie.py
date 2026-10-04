@@ -238,3 +238,31 @@ def test_bulletin_d_un_nom_compose(periode):
     enseignant = enseignant_service.lister_enseignants()[0]
     assert enseignant.nom == "BELLA NGONO"  # nom composé : « BELLA_NGONO » dans le nom du fichier
     assert bulletin_service.generer_bulletin_enseignant(periode.id, enseignant.id).chemin.exists()
+
+
+def test_rapprochement_avec_les_fiches_de_l_application(periode):
+    # Fiches saisies avant l'import : nom complet dans « Nom », prénom vide ; nom avec un prénom en plus.
+    sans_prenom = enseignant_repository.creer(Enseignant(nom="OKALA DIDIER", sexe=Sexe.HOMME,
+                                                         statut=StatutEnseignant.VACATAIRE, taux_horaire=1700))
+    prenom_en_plus = enseignant_repository.creer(Enseignant(nom="TABI", prenom="NGWA BERNARD", sexe=Sexe.HOMME,
+                                                            statut=StatutEnseignant.VACATAIRE, taux_horaire=1800))
+    lu = _lire(dict(VACATAIRE, nom="OKALA DIDIER", sexe="M", taux=1700),
+               dict(VACATAIRE, nom="TABI BERNARD", sexe="M", taux=1800),
+               dict(VACATAIRE, nom="NOUVEAU Venu"))
+    lignes = svc.verifier_lignes(lu.lignes, periode.id)
+    assert [l.action for l in lignes] == ["Mise à jour", "Mise à jour", "Création"]
+    assert lignes[0].modifications == ["Nom et prénom : « OKALA DIDIER » → nom « OKALA », prénom « DIDIER »"]
+    assert "Rapproché de la fiche « TABI NGWA BERNARD »" in lignes[1].remarques[0]
+    svc.enregistrer_lignes(lignes, periode.id, "paie.xlsm")
+    assert len(enseignant_service.lister_enseignants()) == 3  # aucun doublon créé
+    fiche = enseignant_service.obtenir_enseignant(sans_prenom)
+    assert (fiche.nom, fiche.prenom) == ("OKALA", "DIDIER")
+    assert enseignant_service.obtenir_enseignant(prenom_en_plus).prenom == "NGWA BERNARD"  # nom complet conservé
+
+
+def test_nom_proche_de_plusieurs_fiches_cree_une_nouvelle(periode):
+    for prenom in ("Marie Claire", "Marie Louise"):
+        enseignant_repository.creer(Enseignant(nom="NGONO", prenom=prenom, sexe=Sexe.FEMME,
+                                               statut=StatutEnseignant.VACATAIRE, taux_horaire=1800))
+    ligne = svc.verifier_lignes(_lire(dict(VACATAIRE, nom="NGONO Marie")).lignes, periode.id)[0]
+    assert ligne.action == "Création" and "Plusieurs fiches ont un nom proche" in ligne.remarques[0]

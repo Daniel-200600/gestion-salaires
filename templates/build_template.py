@@ -132,6 +132,10 @@ POLICE_SIGNATURE = "Arial"
 # S/N | désignation (début) | désignation | heures | taux / GAINS | gains | RETENUES
 LARGEURS = [47.1, 44.9, 185.9, 52.2, 52.1, 52.3, 93.8]
 TRAIT_EPAIS = 12  # huitièmes de point (1,5 pt)
+# Version de la mise en page : un changement fait reconstruire les modèles de
+# l'établissement au démarrage (services/identite_etablissement_service.py).
+VERSION_MISE_EN_PAGE = "2"
+NOM_FICHIER_VERSION = "mise_en_page.txt"
 TRAIT_FIN = 6
 
 
@@ -316,7 +320,7 @@ def _lignes_entete(textes, francais: bool):
     for texte in textes:
         devise = "Paix" in texte or "Peace" in texte
         grande = francais and (devise or texte.startswith("REGION"))
-        lignes.append((texte, 9 if grande else 7, devise))
+        lignes.append((texte, 9.5 if grande else 7.5, devise))
     return lignes
 
 
@@ -349,7 +353,7 @@ def construire_document(variante: str = "word", identite: IdentiteEtablissement 
     section.orientation = WD_ORIENT.PORTRAIT
     section.page_height = Cm(29.7)
     section.page_width = Cm(21.0)
-    section.top_margin = Pt(89.7)
+    section.top_margin = Pt(56)
     section.bottom_margin = Cm(1.0)
     marge = (Cm(21.0).pt - sum(LARGEURS)) / 2
     section.left_margin = Pt(marge)
@@ -369,17 +373,17 @@ def construire_document(variante: str = "word", identite: IdentiteEtablissement 
     _grille_fixe(table, LARGEURS)
 
     # 0. En-tête institutionnel ---------------------------------------
-    _hauteur(table.rows[0], 80.2)
+    _hauteur(table.rows[0], 92)
     c = _fusion(table, 0, 0, 6)
     _entete(c, identite)
     _bordures_cellule(c, bottom=TRAIT_EPAIS)
 
     # 1. BULLETIN DE SOLDE / PAYSLIP | mois -----------------------------
-    _hauteur(table.rows[1], 14.4)
+    _hauteur(table.rows[1], 22)
     _fusionner_ligne_en_deux(table, 1, 4)
     gauche, droite = table.cell(1, 0), table.cell(1, 4)
-    _ecrire(gauche, "BULLETIN DE SOLDE / PAYSLIP")
-    _ecrire(droite, b["PERIODE"])
+    _ecrire(gauche, "BULLETIN DE SOLDE / PAYSLIP", taille=13)
+    _ecrire(droite, b["PERIODE"], taille=13)
     for cellule in (gauche, droite):
         _ombrer(cellule, VERT)
         _bordures_cellule(cellule, top=TRAIT_EPAIS, bottom=TRAIT_EPAIS)
@@ -387,11 +391,11 @@ def construire_document(variante: str = "word", identite: IdentiteEtablissement 
     _bordures_cellule(droite, left=TRAIT_EPAIS)
 
     # 2. Nom | Statut (jaune) ------------------------------------------
-    _hauteur(table.rows[2], 33.3)
+    _hauteur(table.rows[2], 34)
     _fusionner_ligne_en_deux(table, 2, 3)
     gauche, droite = table.cell(2, 0), table.cell(2, 3)
-    _ecrire(gauche, b["NOM"])
-    _ecrire(droite, b["STATUT"])
+    _ecrire(gauche, b["NOM"], taille=13.5)
+    _ecrire(droite, b["STATUT"], taille=13)
     for cellule in (gauche, droite):
         _ombrer(cellule, JAUNE)
         _bordures_cellule(cellule, top=TRAIT_EPAIS, bottom=TRAIT_EPAIS)
@@ -399,18 +403,18 @@ def construire_document(variante: str = "word", identite: IdentiteEtablissement 
     _bordures_cellule(droite, left=TRAIT_EPAIS)
 
     # 3. Bande jaune vide ---------------------------------------------
-    _hauteur(table.rows[3], 14.4)
+    _hauteur(table.rows[3], 6)
     c = _fusion(table, 3, 0, 6)
     _ecrire(c, "")
     _ombrer(c, JAUNE)
     _bordures_cellule(c, top=TRAIT_EPAIS, bottom=TRAIT_EPAIS)
 
     # 4. ELEMENTS DE RENUMERATION / SALARY RUBRICS | MONTANT / AMOUNT ----
-    _hauteur(table.rows[4], 14.4)
+    _hauteur(table.rows[4], 21)
     _fusionner_ligne_en_deux(table, 4, 4)
     gauche, droite = table.cell(4, 0), table.cell(4, 4)
-    _ecrire(gauche, "ELEMENTS DE RENUMERATION / SALARY RUBRICS")
-    _ecrire(droite, "MONTANT / AMOUNT")
+    _ecrire(gauche, "ELEMENTS DE RENUMERATION / SALARY RUBRICS", taille=11.5)
+    _ecrire(droite, "MONTANT / AMOUNT", taille=11.5)
     for cellule in (gauche, droite):
         _ombrer(cellule, VERT)
         _bordures_cellule(cellule, top=TRAIT_EPAIS, bottom=TRAIT_EPAIS)
@@ -418,13 +422,15 @@ def construire_document(variante: str = "word", identite: IdentiteEtablissement 
     _bordures_cellule(droite, left=TRAIT_EPAIS)
 
     # 5. En-têtes de colonnes -------------------------------------------
-    _hauteur(table.rows[5], 14.1)
-    _ecrire(table.cell(5, 0), "S/N")
-    designation = _fusion(table, 5, 1, 3)
-    _ecrire(designation, "DESIGNATION", alignement=WD_ALIGN_PARAGRAPH.LEFT, retrait_gauche=139.0)
-    _ecrire(table.cell(5, 4), "GAINS")
-    _ecrire(table.cell(5, 5), "")
-    _ecrire(table.cell(5, 6), "RETENUES")
+    # Intitulé de chaque colonne de montants : heures, taux, gains, retenues.
+    _hauteur(table.rows[5], 21)
+    _ecrire(table.cell(5, 0), "S/N", taille=10)
+    designation = _fusion(table, 5, 1, 2)
+    _ecrire(designation, "DESIGNATION", taille=10, alignement=WD_ALIGN_PARAGRAPH.LEFT, retrait_gauche=4.0)
+    _ecrire(table.cell(5, 3), "HEURES", taille=9)
+    _ecrire(table.cell(5, 4), "TAUX", taille=9)
+    _ecrire(table.cell(5, 5), "GAINS", taille=10)
+    _ecrire(table.cell(5, 6), "RETENUES", taille=10)
     for index in range(7):
         _bordures_cellule(table.cell(5, index), top=TRAIT_EPAIS, bottom=TRAIT_FIN)
 
@@ -438,26 +444,32 @@ def construire_document(variante: str = "word", identite: IdentiteEtablissement 
         ("6", "Retenue Amicale / Social Deduction", {6: b["RETENUE_AMICALE"]}, 0),
         ("7", "Dette / Debt", {6: b["DETTE"]}, 0),
     ]
-    haut = WD_CELL_VERTICAL_ALIGNMENT.TOP
     for decalage, (numero, libelle, montants, retrait) in enumerate(rubriques):
         indice = 6 + decalage
-        _hauteur(table.rows[indice], 27.3)
-        _ecrire(table.cell(indice, 0), numero, vertical=haut)
+        _hauteur(table.rows[indice], 30)
+        centre = WD_CELL_VERTICAL_ALIGNMENT.CENTER
+        _ecrire(table.cell(indice, 0), numero, taille=11.5, vertical=centre)
         cellule_libelle = _fusion(table, indice, 1, 2)
-        _ecrire(cellule_libelle, libelle, alignement=WD_ALIGN_PARAGRAPH.LEFT, vertical=haut, retrait_gauche=retrait)
+        _ecrire(cellule_libelle, libelle, taille=11.5, alignement=WD_ALIGN_PARAGRAPH.LEFT, vertical=centre,
+                retrait_gauche=retrait or 4.0)
         for colonne in range(3, 7):
-            _ecrire(table.cell(indice, colonne), montants.get(colonne, ""), vertical=haut)
+            # Montants alignés à droite (lecture des chiffres facilitée), heures et taux centrés.
+            a_droite = colonne in (5, 6)
+            _ecrire(table.cell(indice, colonne), montants.get(colonne, ""), taille=12 if a_droite else 11.5,
+                    vertical=centre, alignement=WD_ALIGN_PARAGRAPH.RIGHT if a_droite else WD_ALIGN_PARAGRAPH.CENTER,
+                    retrait_droit=8.0 if a_droite else 0)
 
     # 13. Total ----------------------------------------------------------
-    _hauteur(table.rows[13], 14.4)
+    _hauteur(table.rows[13], 23)
     etiquette = _fusion(table, 13, 0, 1)
     vide = _fusion(table, 13, 2, 3)
     total_gains = _fusion(table, 13, 4, 5)
     total_retenues = table.cell(13, 6)
-    _ecrire(etiquette, "Total")
+    _ecrire(etiquette, "Total", taille=12.5)
     _ecrire(vide, "")
-    _ecrire(total_gains, b["TOTAL_GAINS"])
-    _ecrire(total_retenues, b["TOTAL_RETENUES"])
+    _ecrire(total_gains, b["TOTAL_GAINS"], taille=12.5, alignement=WD_ALIGN_PARAGRAPH.RIGHT, retrait_droit=8.0)
+    _ecrire(total_retenues, b["TOTAL_RETENUES"], taille=12.5, alignement=WD_ALIGN_PARAGRAPH.RIGHT,
+            retrait_droit=8.0)
     for cellule in (etiquette, vide, total_gains, total_retenues):
         _ombrer(cellule, VERT)
         _bordures_cellule(cellule, top=TRAIT_EPAIS, bottom=TRAIT_EPAIS)
@@ -466,13 +478,14 @@ def construire_document(variante: str = "word", identite: IdentiteEtablissement 
     _bordures_cellule(total_retenues, left=TRAIT_EPAIS)
 
     # 14. NET A PAYER ----------------------------------------------------
-    _hauteur(table.rows[14], 14.4)
+    # Net à payer mis en avant : ligne plus haute, montant en grand.
+    _hauteur(table.rows[14], 32)
     etiquette = _fusion(table, 14, 0, 1)
     lettres = _fusion(table, 14, 2, 4)
     montant = _fusion(table, 14, 5, 6)
-    _ecrire(etiquette, "NET A PAYER")
-    _ecrire(lettres, b["NET_EN_LETTRES"], taille=10)
-    _ecrire(montant, b["NET_A_PAYER"])
+    _ecrire(etiquette, "NET A PAYER", taille=13)
+    _ecrire(lettres, b["NET_EN_LETTRES"], taille=10.5)
+    _ecrire(montant, b["NET_A_PAYER"], taille=16)
     for cellule in (etiquette, lettres, montant):
         _ombrer(cellule, VERT)
         _bordures_cellule(cellule, top=TRAIT_EPAIS, bottom=TRAIT_EPAIS)
@@ -481,25 +494,25 @@ def construire_document(variante: str = "word", identite: IdentiteEtablissement 
     _bordures_cellule(montant, left=TRAIT_EPAIS)
 
     # 15. Fait à ... le : (vierge : date et signature manuscrites) -------
-    _hauteur(table.rows[15], 14.0)
+    _hauteur(table.rows[15], 22)
     _ecrire(table.cell(15, 0), "")
     cellule_lieu = _fusion(table, 15, 1, 6)
     _ecrire(cellule_lieu, f"Done at {identite.lieu_signature} on the / Fait à {identite.lieu_signature} le:",
-            vertical=WD_CELL_VERTICAL_ALIGNMENT.TOP)
+            taille=11.5, vertical=WD_CELL_VERTICAL_ALIGNMENT.CENTER)
     _bordures_cellule(table.cell(15, 0), top=TRAIT_EPAIS)
     _bordures_cellule(cellule_lieu, top=TRAIT_EPAIS)
 
     # 16. Espace de signature ---------------------------------------------
-    _hauteur(table.rows[16], 54.8)
+    _hauteur(table.rows[16], 62)
     _ecrire(_fusion(table, 16, 0, 6), "")
 
     # 17. Titre du signataire ----------------------------------------------
-    _hauteur(table.rows[17], 13.8)
-    _ecrire(_fusion(table, 17, 0, 6), identite.titre_signataire_fr + identite.titre_signataire_en,
+    _hauteur(table.rows[17], 18)
+    _ecrire(_fusion(table, 17, 0, 6), identite.titre_signataire_fr + identite.titre_signataire_en, taille=11.5,
             alignement=WD_ALIGN_PARAGRAPH.RIGHT, police=POLICE_SIGNATURE, retrait_droit=34.0)
 
     # 18. Marge basse du cadre ---------------------------------------------
-    _hauteur(table.rows[18], 14.5)
+    _hauteur(table.rows[18], 12)
     _ecrire(_fusion(table, 18, 0, 6), "")
 
     # Paragraphe final imposé par Word : réduit au minimum.
@@ -563,7 +576,16 @@ def construire_modele_pdf(
     trouvees = set(propositions.values())
     if trouvees != attendues:
         raise RuntimeError(f"Détection incomplète du modèle standard : manquent {sorted(attendues - trouvees)}")
-    zones = [pdf_export.zone_depuis_segment(s, propositions[s.id]).to_dict() for s in segments if s.id in propositions]
+    # Colonnes de montants alignées à droite, comme dans le modèle Word : un montant plus long que la
+    # valeur d'exemple (« 5 000 » au lieu de « 0 ») s'étend vers la gauche, jamais au-delà du cadre.
+    a_droite = {"GAIN_HEURES", "PRIME_AP_PP", "SURVEILLANCE_SECRETARIAT", "INDEMNITE_SUGGESTION_ADMIN", "TAXE",
+                "RETENUE_AMICALE", "DETTE", "TOTAL_GAINS", "TOTAL_RETENUES"}
+    zones = [
+        pdf_export.zone_depuis_segment(
+            s, propositions[s.id], alignement="droite" if propositions[s.id] in a_droite else "centre"
+        ).to_dict()
+        for s in segments if s.id in propositions
+    ]
     chemin_pdf.parent.mkdir(parents=True, exist_ok=True)
     chemin_pdf.write_bytes(contenu)
     chemin_zones.write_text(json.dumps(zones, ensure_ascii=False, indent=1), encoding="utf-8")

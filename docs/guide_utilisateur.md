@@ -63,8 +63,10 @@ Page **Gestion › Périodes de paie**. Une période correspond à un mois de pa
 - **Création** : ouvrez **Créer une période**, choisissez le mois et l'année, puis cliquez sur **Créer la période**. Une seule période peut exister pour un même mois et une même année. Tant qu'elle est au statut Brouillon, son mois et son année peuvent être corrigés.
 - **Ouverture** : **Ouvrir cette période**. La saisie des heures, primes, indemnités et retenues n'est possible que sur une période ouverte.
 - **Validation** : depuis **Contrôle & Historique › Contrôle de la paie** (voir section 8). La validation gèle les données de paie.
-- **Clôture** : depuis la même page, par un administrateur. Une période clôturée ne peut plus être modifiée ni supprimée.
-- **Suppression définitive** (administrateurs uniquement) : possible uniquement pour une période au statut Brouillon et sans bulletin.
+- **Clôture** : depuis la même page, par un administrateur. Une période clôturée n'est plus modifiable par la saisie.
+- **Rouvrir (invalider) une période** (administrateurs uniquement) : partie **Rouvrir ou supprimer la période**. Une période validée ou clôturée redevient ouverte : ses données redeviennent modifiables ; après correction, validez-la de nouveau et produisez les bulletins. Saisissez le nom de la période (par exemple « Septembre 2026 ») pour confirmer ; un motif peut être indiqué.
+- **Supprimer une période** (administrateurs uniquement) : quel que soit son statut, la période est supprimée avec ses heures, primes, retenues et bulletins enregistrés ; les fiches des enseignants sont conservées. Saisissez le nom de la période pour confirmer.
+- Avant chacune de ces deux actions, une **sauvegarde de la base** est créée automatiquement (Administration › Restauration permet d'y revenir) ; l'action est inscrite au journal d'audit.
 - **Taux de taxe** : la taxe ne concerne que les **vacataires** ; les permanents n'en paient pas. Chaque période porte son propre taux de taxe, affiché dans la liste (colonne **Taxe**, par exemple « 5,5 %, vacataires »). À la création, elle reçoit le taux par défaut réglé par l'administrateur (section 14). Tant que la période est en brouillon ou ouverte, un administrateur peut l'ajuster (**Appliquer ce taux à la période**) ; dès la validation, il est figé.
 
 La page **Paie › Cycle de paie** affiche l'étape actuelle de la période, sa progression et l'historique de ses changements de statut.
@@ -93,7 +95,8 @@ Page **Paie › Import du fichier de paie** (administrateurs et gestionnaires de
    - Les heures retenues sont celles de la **feuille des heures** ; si la feuille des informations en indique d'autres, l'écart est signalé.
    - Un **permanent** dont le gain est un montant saisi (sans taux horaire) est enregistré avec un **salaire mensuel fixe**.
    - Le net de chaque ligne est recalculé par l'application et comparé à celui de l'état comptable ; un écart est signalé, jamais corrigé en silence (il vient en général d'heures différentes entre les feuilles, de l'arrondi de la taxe ou d'une prime que l'application taxe).
-   - Un nom écrit autrement dans deux feuilles, un enseignant déjà enregistré dont la fiche change (taux, statut…) ou un nom proche d'une fiche existante sont aussi signalés.
+   - **Rapprochement des noms** : chaque nom du fichier est rapproché des fiches de l'application — mêmes mots dans n'importe quel ordre, sans tenir compte des accents ni des majuscules ; à défaut, une seule fiche au nom très proche (prénom en plus ou en moins, faute de frappe) est retenue et signalée. Une fiche enregistrée sans prénom (nom complet dans « Nom ») reçoit le nom et le prénom du fichier. Un nom du fichier inconnu de l'application devient une nouvelle fiche.
+   - Un nom écrit autrement dans deux feuilles, ou une fiche existante dont le taux ou le statut change, sont aussi signalés.
 3. **Compléter ou corriger** : le tableau reprend chaque ligne ; modifiez une case (double-clic), décochez **Importer** pour écarter une ligne, puis cliquez sur **Vérifier à nouveau**. Une ligne en erreur (sexe, statut ou taux manquant, taux horaire nul, net négatif — les retenues dépassent les gains —, enseignant désactivé…) doit être corrigée ou décochée. Un nom absent ou incomplet ne bloque jamais : une ligne sans nom est enregistrée sous un nom provisoire (« SANS NOM 12 »), à corriger ensuite dans Gestion › Enseignants.
 4. **Valider** : cochez la confirmation, puis **Enregistrer dans la période**. Les fiches sont créées ou mises à jour (le nom d'une fiche existante est conservé) et les heures, primes et retenues sont enregistrées dans la période, en une seule opération : en cas d'erreur, rien n'est enregistré. Les données déjà saisies pour ces enseignants dans la période sont remplacées. L'import est inscrit au journal d'audit.
 5. Poursuivez avec **Calcul de paie** puis **Contrôle de la paie** (liens proposés après l'enregistrement).
@@ -124,7 +127,7 @@ Les périodes validées ou clôturées avant la version 1.6.0 gardent la règle 
 Page **Paie › Bulletins de solde**.
 
 - **Génération** : choisissez la période, puis les enseignants (tous ou une sélection), vérifiez la prévisualisation et cliquez sur **Générer les bulletins**. Sur une période encore ouverte, les bulletins sont provisoires. Les anomalies bloquantes détectées sur la sélection sont signalées avant la génération.
-- **Consultation** : chaque bulletin reproduit le bulletin officiel de l'établissement (en-tête bilingue et logo, bandes vertes et jaune, rubriques numérotées de 1 à 7, total, net à payer en chiffres et en lettres, zone « Fait à Yaoundé le : » laissée vierge pour la date et la signature). Il est produit au format du modèle actif, Word (.docx) ou PDF, choisi par l'administrateur (section 14). Le nom du modèle utilisé est rappelé en haut de la page. Les bulletins sont enregistrés dans le registre des documents (section 10).
+- **Consultation** : chaque bulletin reproduit le bulletin officiel de l'établissement (en-tête bilingue et logo, bandes vertes et jaune, rubriques numérotées de 1 à 7, total, net à payer en chiffres et en lettres, zone « Fait à Yaoundé le : » laissée vierge pour la date et la signature). Pour une lecture claire, chaque colonne de montants porte son intitulé (heures, taux, gains, retenues), les montants sont alignés à droite avec un séparateur de milliers (« 71 400 ») et le net à payer est écrit en grand. Un nom ou un prénom manquant n'empêche jamais la production du bulletin. Il est produit au format du modèle actif, Word (.docx) ou PDF, choisi par l'administrateur (section 14). Le nom du modèle utilisé est rappelé en haut de la page. Les bulletins sont enregistrés dans le registre des documents (section 10).
 - **Export** : téléchargez un bulletin individuel ou l'archive ZIP de tous les bulletins générés.
 
 Pour une période clôturée, un bulletin déjà existant n'est jamais régénéré ni écrasé.
@@ -143,7 +146,7 @@ La page **Historique de paie** présente, pour un enseignant, les montants de ch
 
 - **Consultation** : **Analyse & Rapports › Rapports comptables** présente l'état général de la période, le détail par enseignant, le classement, les synthèses par groupe, l'état des retenues, le rapprochement et la comparaison entre périodes. **Statistiques** présente la vue générale, les heures, les rémunérations, les groupes, l'évolution dans le temps, les composantes, les valeurs atypiques et l'analyse individuelle.
 - **Filtres** : période, statut (permanent ou vacataire) et sexe ; critère et ordre de classement ; période de comparaison. Si aucun enregistrement ne correspond, la page l'indique.
-- **Exports** : **Générer l'état de paie Excel** (rapports) et **Générer l'export Excel** (statistiques), puis téléchargez le fichier produit. Les montants exportés sont ceux du moteur de calcul, sans recalcul.
+- **Exports** : **Générer l'état de paie Excel** (rapports) et **Générer l'export Excel** (statistiques), puis téléchargez le fichier produit. Les montants exportés sont ceux du moteur de calcul, sans recalcul. Le logo de l'établissement (Administration › Paramètres) figure en haut de chaque feuille de tous les fichiers Excel exportés.
 
 ## 10. Documents
 

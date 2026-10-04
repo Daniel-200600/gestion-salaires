@@ -173,10 +173,10 @@ def generer_nom_fichier_bulletin(nom: str, prenom: str, libelle_periode: str, ex
     bulletin individuel, ex : Bulletin_KAMGANG_JEAN_PAUL_AOUT_2026.docx
     (ou .pdf lorsque le modèle actif est un modèle PDF).
     """
-    nom_nettoye = nettoyer_nom_fichier(nom.upper())
-    prenom_nettoye = nettoyer_nom_fichier(prenom.upper())
+    # Nom ou prénom absent : simplement omis (jamais « sans_nom » dans le nom du fichier).
+    morceaux = [nettoyer_nom_fichier(texte.upper()) for texte in (nom or "", prenom or "") if texte.strip()]
     periode_nettoyee = nettoyer_nom_fichier(libelle_periode.upper())
-    return f"Bulletin_{nom_nettoye}_{prenom_nettoye}_{periode_nettoyee}{extension}"
+    return "_".join(["Bulletin", *morceaux, periode_nettoyee]) + extension
 
 
 def sauvegarder_document(document: Document, chemin: Path) -> Path:

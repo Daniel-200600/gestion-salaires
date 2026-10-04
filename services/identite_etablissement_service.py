@@ -148,6 +148,7 @@ def generer_modeles(identite: IdentiteEtablissement) -> RapportGeneration:
     """
     dossier = settings.MODELES_ETABLISSEMENT_DIR
     word = build_template.construire_template(dossier / build_template.CHEMIN_TEMPLATE.name, identite)
+    _noter_version_mise_en_page(dossier)
     chemin_pdf = dossier / build_template.CHEMIN_MODELE_PDF.name
     chemin_zones = dossier / build_template.CHEMIN_ZONES_PDF.name
 
@@ -167,18 +168,40 @@ def generer_modeles(identite: IdentiteEtablissement) -> RapportGeneration:
     return RapportGeneration(word, None, avertissement)
 
 
+def _noter_version_mise_en_page(dossier) -> None:
+    (dossier / build_template.NOM_FICHIER_VERSION).write_text(build_template.VERSION_MISE_EN_PAGE, encoding="utf-8")
+
+
+def _mise_en_page_a_jour(dossier) -> bool:
+    try:
+        version = (dossier / build_template.NOM_FICHIER_VERSION).read_text(encoding="utf-8").strip()
+    except OSError:
+        return False
+    return version == build_template.VERSION_MISE_EN_PAGE
+
+
 def assurer_modeles_etablissement(db_path: DbPath = None) -> Optional[RapportGeneration]:
     """
     Reconstruit les modèles de l'établissement s'ils manquent alors qu'une
     identité est réglée (base restaurée sur un autre poste, dossier de
-    données effacé...). Ne lève jamais d'exception.
+    données effacé...) ou s'ils datent d'une mise en page antérieure (mise
+    à jour du logiciel). Sans LibreOffice, un modèle PDF déjà produit est
+    conservé (il garde l'en-tête de l'établissement) ; seul le modèle Word
+    est refait. Ne lève jamais d'exception.
     """
     try:
         identite = obtenir_identite(db_path=db_path)
-        modele_word = settings.MODELES_ETABLISSEMENT_DIR / build_template.CHEMIN_TEMPLATE.name
-        if identite is None or modele_word.exists():
+        dossier = settings.MODELES_ETABLISSEMENT_DIR
+        modele_word = dossier / build_template.CHEMIN_TEMPLATE.name
+        if identite is None or (modele_word.exists() and _mise_en_page_a_jour(dossier)):
             return None
-        logger.info("Modèles de l'établissement absents : reconstruction.")
+        modele_pdf = dossier / build_template.CHEMIN_MODELE_PDF.name
+        if modele_word.exists() and modele_pdf.exists() and build_template.trouver_libreoffice() is None:
+            logger.info("Nouvelle mise en page : modèle Word de l'établissement refait (PDF conservé).")
+            build_template.construire_template(modele_word, identite)
+            _noter_version_mise_en_page(dossier)
+            return RapportGeneration(modele_word, modele_pdf)
+        logger.info("Modèles de l'établissement absents ou d'une mise en page antérieure : reconstruction.")
         return generer_modeles(identite)
     except Exception as erreur:  # noqa: BLE001 — jamais bloquant au démarrage
         logger.error("Reconstruction des modèles de l'établissement impossible : %s", erreur)

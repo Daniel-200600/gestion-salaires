@@ -11,6 +11,7 @@ from pathlib import Path
 from typing import List, Optional
 
 from openpyxl import Workbook
+from exports.logo_excel import ajouter_logo
 from openpyxl.utils import get_column_letter
 
 from exports.excel_export import (
@@ -157,7 +158,7 @@ def generer_classeur_statistiques(
     if outliers is not None:
         _feuille_outliers(classeur, outliers)
 
-    return classeur
+    return ajouter_logo(classeur)
 
 
 def generer_fichier_statistiques(

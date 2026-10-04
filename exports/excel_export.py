@@ -15,6 +15,7 @@ from pathlib import Path
 from typing import Optional
 
 from openpyxl import Workbook
+from exports.logo_excel import ajouter_logo
 from openpyxl.styles import Alignment, Border, Font, PatternFill, Side
 from openpyxl.utils import get_column_letter
 from openpyxl.worksheet.worksheet import Worksheet
@@ -334,7 +335,7 @@ def generer_classeur_comptable(etat: EtatComptablePeriode, etablissement: str = 
     feuille_heures = classeur.create_sheet("Détail heures")
     _construire_feuille_detail_heures(feuille_heures, etat)
 
-    return classeur
+    return ajouter_logo(classeur)
 
 
 def generer_nom_fichier(etat: EtatComptablePeriode) -> str:
