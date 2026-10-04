@@ -31,8 +31,8 @@ def creer(periode: PeriodePaie, db_path: DbPath = None) -> int:
     """Insère une nouvelle période (toujours créée au statut BROUILLON par défaut du schéma)."""
     with get_connection(db_path) as conn:
         curseur = conn.execute(
-            "INSERT INTO periodes_paie (mois, annee, libelle, taux_taxe) VALUES (?, ?, ?, ?)",
-            (periode.mois, periode.annee, periode.libelle, str(periode.taux_taxe)),
+            "INSERT INTO periodes_paie (mois, annee, libelle, taux_taxe, taxe_permanents) VALUES (?, ?, ?, ?, ?)",
+            (periode.mois, periode.annee, periode.libelle, str(periode.taux_taxe), int(periode.taxe_permanents)),
         )
         conn.commit()
         return curseur.lastrowid

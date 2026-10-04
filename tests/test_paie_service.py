@@ -13,6 +13,9 @@ from services import donnees_paie_service, enseignant_service, paie_service, per
 from services.donnees_paie_service import DonneesPaieEnseignant
 from services.paie_service import CalculPaieError
 
+# Cas de référence officiel : vacataire, taxe de 5 %.
+pytestmark = pytest.mark.taxe_historique
+
 
 @pytest.fixture(autouse=True)
 def _rediriger_connexion_par_defaut(db_path, monkeypatch):
@@ -24,7 +27,7 @@ def _rediriger_connexion_par_defaut(db_path, monkeypatch):
 # ---------------------------------------------------------------------
 
 def _creer_enseignant(**overrides):
-    donnees = {"nom": "Traore", "prenom": "Salif", "sexe": "M", "statut": "P", "taux_horaire": 1000}
+    donnees = {"nom": "Traore", "prenom": "Salif", "sexe": "M", "statut": "V", "taux_horaire": 1000}
     donnees.update(overrides)
     return enseignant_service.creer_enseignant(**donnees)
 

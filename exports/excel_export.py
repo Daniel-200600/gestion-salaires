@@ -21,7 +21,7 @@ from openpyxl.worksheet.worksheet import Worksheet
 
 from config.settings import DATA_DIR
 from services.comptabilite_service import EtatComptablePeriode
-from utils.formatters import dates_periode, formater_taux_taxe, libelle_sexe, libelle_statut, libelle_statut_periode, nettoyer_nom_fichier
+from utils.formatters import dates_periode, formater_taxe_periode, libelle_sexe, libelle_statut, libelle_statut_periode, nettoyer_nom_fichier
 
 EXPORT_DIR = DATA_DIR / "exports"
 
@@ -211,7 +211,7 @@ def _construire_feuille_synthese(feuille: Worksheet, etat: EtatComptablePeriode,
         ("Nombre d'enseignants", len(etat.resultats), None),
         ("Total heures", totaux.total_heures, FORMAT_HEURES),
         ("Masse salariale brute (base taxable)", totaux.total_gain_heures + totaux.total_primes, FORMAT_FCFA),
-        (f"Total taxe ({formater_taux_taxe(etat.periode.taux_taxe)})", totaux.total_taxe, FORMAT_FCFA),
+        (f"Total taxe ({formater_taxe_periode(etat.periode)})", totaux.total_taxe, FORMAT_FCFA),
         ("Total retenues (amicale + dette)", totaux.total_retenues, FORMAT_FCFA),
         ("Total net à percevoir", totaux.total_net_a_percevoir, FORMAT_FCFA),
     ]

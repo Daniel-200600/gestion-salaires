@@ -184,11 +184,27 @@ def test_valeurs_citees_conformes_a_la_configuration():
     assert settings.PASSWORD_MIN_LENGTH == 8 and "8 caractères minimum" in guide
     assert settings.MAX_LOGIN_ATTEMPTS == 5 and "cinq tentatives" in guide and "cinq tentatives" in politique
     assert settings.SESSION_TIMEOUT_SECONDES == 2 * 60 * 60 and "deux heures" in guide
-    assert settings.TAUX_TAXE == Decimal("0.05") and "5 %" in guide
+    assert settings.TAUX_TAXE == Decimal("0.055") and "5,5 %" in guide and "vacataire" in guide
     assert TAILLE_MAX_OCTETS == 10 * 1024 * 1024 and "10 Mo" in guide
     assert PHRASE_CONFIRMATION in guide
     assert settings.NB_SEMAINES_PAR_PERIODE == 5 and "cinq semaines" in guide
-    assert "208 250 FCFA" in guide  # cas de référence, identique à tests/test_paie_service.py
+    # Exemples du guide, recalculés par le moteur de paie (taux par défaut de 5,5 %).
+    from types import SimpleNamespace
+
+    from models.enums import StatutEnseignant
+    from services.paie_service import _calculer_resultat
+
+    def net(statut, taux_horaire, heures, primes=0, retenues=0):
+        enseignant = SimpleNamespace(id=1, nom="X", prenom="Y", sexe=None, statut=statut, taux_horaire=taux_horaire)
+        return _calculer_resultat(1, enseignant, {1: heures}, {"prime_ap_pp": primes}, {"dette": retenues})
+
+    vacataire, permanent = StatutEnseignant.VACATAIRE, StatutEnseignant.PERMANENT
+    assert (net(vacataire, 1800, 10).taxe_5, net(vacataire, 1800, 10).net_a_percevoir) == (990, 17010)
+    assert "taxe de 990 FCFA" in guide and "net de 17 010 FCFA" in guide
+    reference = net(vacataire, 2000, 100, 35000, 15000)
+    assert (reference.taxe_5, reference.net_a_percevoir) == (12925, 207075)
+    assert "12 925 FCFA" in guide and "207 075 FCFA" in guide
+    assert net(permanent, 2000, 100, 35000, 15000).net_a_percevoir == 220000 and "220 000 FCFA" in guide
 
 
 def test_pages_citees_par_le_guide_existent_dans_la_navigation():

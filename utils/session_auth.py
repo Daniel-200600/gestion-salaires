@@ -259,7 +259,8 @@ def _afficher_ecran_bienvenue() -> None:
     fonctions = [
         ("Saisie et calcul",
          f"Heures hebdomadaires, taux horaire, primes, indemnités et retenues. Calcul du net à payer "
-         f"avec application de la taxe ({taux} par défaut, taux réglable par l'administrateur)."),
+         f"avec application de la taxe aux vacataires ({taux} par défaut, taux réglable par "
+         f"l'administrateur)."),
         ("Bulletins et états",
          "Bulletins de solde au format Word ou PDF, fidèles au modèle de l'établissement. États comptables, rapports et statistiques exportables "
          "au format Excel."),

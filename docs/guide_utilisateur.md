@@ -64,7 +64,7 @@ Page **Gestion › Périodes de paie**. Une période correspond à un mois de pa
 - **Validation** : depuis **Contrôle & Historique › Contrôle de la paie** (voir section 8). La validation gèle les données de paie.
 - **Clôture** : depuis la même page, par un administrateur. Une période clôturée ne peut plus être modifiée ni supprimée.
 - **Suppression définitive** (administrateurs uniquement) : possible uniquement pour une période au statut Brouillon et sans bulletin.
-- **Taux de taxe** : chaque période porte son propre taux de taxe, affiché dans la liste. À la création, elle reçoit le taux par défaut réglé par l'administrateur (section 14). Tant que la période est en brouillon ou ouverte, un administrateur peut l'ajuster (**Appliquer ce taux à la période**) ; dès la validation, il est figé.
+- **Taux de taxe** : la taxe ne concerne que les **vacataires** ; les permanents n'en paient pas. Chaque période porte son propre taux de taxe, affiché dans la liste (colonne **Taxe**, par exemple « 5,5 %, vacataires »). À la création, elle reçoit le taux par défaut réglé par l'administrateur (section 14). Tant que la période est en brouillon ou ouverte, un administrateur peut l'ajuster (**Appliquer ce taux à la période**) ; dès la validation, il est figé.
 
 La page **Paie › Cycle de paie** affiche l'étape actuelle de la période, sa progression et l'historique de ses changements de statut.
 
@@ -91,12 +91,16 @@ Le montant net est obtenu ainsi :
 
 1. gain horaire = total des heures × taux horaire ;
 2. base taxable = gain horaire + primes et indemnités ;
-3. taxe = base taxable × taux de taxe de la période (5 % par défaut) ;
+3. taxe = base taxable × taux de taxe de la période (5,5 % par défaut) pour un **vacataire** ; **aucune taxe pour un permanent** ;
 4. net à percevoir = base taxable − taxe − retenues.
 
-Exemple au taux de 5 % : 100 heures à 2 000 FCFA, 35 000 FCFA de primes et indemnités, 15 000 FCFA de retenues donnent une base taxable de 235 000 FCFA, une taxe de 11 750 FCFA et un net de 208 250 FCFA.
+Exemple d'un vacataire : 10 heures à 1 800 FCFA donnent 18 000 FCFA, une taxe de 990 FCFA (5,5 %) et un net de 17 010 FCFA.
 
-Exemple au taux de 5,5 % : 10 heures à 1 800 FCFA donnent 18 000 FCFA, une taxe de 990 FCFA et un net de 17 010 FCFA. Les montants sont arrondis au franc le plus proche.
+Exemple : 100 heures à 2 000 FCFA, 35 000 FCFA de primes et indemnités et 15 000 FCFA de retenues donnent une base taxable de 235 000 FCFA. Pour un vacataire, la taxe est de 12 925 FCFA et le net de 207 075 FCFA ; pour un permanent, la taxe est nulle et le net de 220 000 FCFA.
+
+Les montants sont arrondis au franc le plus proche. Le statut pris en compte est celui de la fiche de l'enseignant au moment du calcul (section 3, **Changer le statut**). Sur le bulletin d'un permanent, la ligne Taxe indique 0.
+
+Les périodes validées ou clôturées avant la version 1.6.0 gardent la règle avec laquelle elles ont été calculées (taxe appliquée à tous les enseignants) : leurs montants ne changent pas. La liste des périodes l'indique (« tous les enseignants »).
 
 **Contrôle du résultat** : comparez les totaux affichés avec les données saisies, puis utilisez la page Contrôle de la paie (section 8) avant toute validation.
 
@@ -174,7 +178,7 @@ Page **Administration & Sécurité › Administration**, réservée aux administ
 
 - **Utilisateurs** : création des comptes, modification du nom, du prénom et du rôle, activation ou désactivation, réinitialisation du mot de passe.
 - **Rôles** : Administrateur, Gestionnaire de paie, Consultation (tableau en début de guide).
-- **Paramètres** : informations de l'établissement ; taux de taxe par défaut des nouvelles périodes (par exemple 5,5 %), avec la possibilité de l'appliquer aussi aux périodes en brouillon ou ouvertes. Les périodes validées ou clôturées ne changent jamais.
+- **Paramètres** : informations de l'établissement ; taux de taxe par défaut des vacataires pour les nouvelles périodes (5,5 % au départ), avec la possibilité de l'appliquer aussi aux périodes en brouillon ou ouvertes. Les périodes validées ou clôturées ne changent jamais.
 - **Modèles de bulletin** : choix du modèle actif (bulletin officiel en Word ou en PDF, ou modèle importé) ; ajout d'un modèle en envoyant un bulletin déjà rempli (Word ou PDF) ou un modèle à balises ; bulletin d'essai avant enregistrement.
 - **Sauvegardes** : création d'une copie horodatée de la base de données.
 - **Restauration** : remplacement de la base par une sauvegarde, après vérification du fichier et création d'une sauvegarde de sécurité.

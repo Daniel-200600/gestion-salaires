@@ -17,7 +17,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 import pandas as pd
 import streamlit as st
 
-from utils.formatters import formater_taux_taxe
+from utils.formatters import formater_taux_taxe, formater_taxe_periode
 
 from database.initialization import init_database
 from services import bulletin_service, dashboard_service, enseignant_service, periode_service
@@ -134,7 +134,7 @@ if etat is not None:
     col1, col2, col3, col4, col5 = st.columns(5)
     col1.metric("Enseignants concernés", len(etat.resultats))
     col2.metric("Total gains", formater_fcfa(etat.totaux.total_gain_heures + etat.totaux.total_primes))
-    col3.metric(f"Total taxe ({formater_taux_taxe(periode.taux_taxe)})", formater_fcfa(etat.totaux.total_taxe))
+    col3.metric(f"Total taxe ({formater_taxe_periode(periode)})", formater_fcfa(etat.totaux.total_taxe))
     col4.metric("Total retenues", formater_fcfa(etat.totaux.total_retenues))
     col5.metric("Total net à percevoir", formater_fcfa(etat.totaux.total_net_a_percevoir))
     st.caption(f"dont total dettes : {formater_fcfa(etat.totaux.total_dette)}")
@@ -237,7 +237,10 @@ if resultats_filtres:
         st.write(f"Indemnité suggestion/admin : {formater_fcfa(r.indemnite_suggestion_admin)}")
     with col_retenues:
         st.markdown("**RETENUES**")
-        st.write(f"Taxe ({formater_taux_taxe(r.taux_taxe)}) : {formater_fcfa(r.taxe_5)}")
+        st.write(
+            f"Taxe ({formater_taux_taxe(r.taux_taxe)}) : {formater_fcfa(r.taxe_5)}" if r.taux_taxe
+            else "Taxe : non applicable (permanent)"
+        )
         st.write(f"Retenue amicale : {formater_fcfa(r.retenue_amicale)}")
         st.write(f"Dette : {formater_fcfa(r.dette)}")
 

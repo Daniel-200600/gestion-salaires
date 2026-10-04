@@ -15,6 +15,9 @@ from services.bulletin_service import BulletinServiceError
 from services.donnees_paie_service import DonneesPaieEnseignant
 from utils.montant_en_lettres import montant_en_lettres
 
+# Cas de référence officiel : vacataire, taxe de 5 %.
+pytestmark = pytest.mark.taxe_historique
+
 
 @pytest.fixture(autouse=True)
 def _rediriger_connexion_par_defaut(db_path, monkeypatch, tmp_path):
@@ -25,7 +28,7 @@ def _rediriger_connexion_par_defaut(db_path, monkeypatch, tmp_path):
 
 
 def _creer_enseignant(**overrides):
-    donnees = {"nom": "Ngono", "prenom": "Marie", "sexe": "F", "statut": "P", "taux_horaire": 1500}
+    donnees = {"nom": "Ngono", "prenom": "Marie", "sexe": "F", "statut": "V", "taux_horaire": 1500}
     donnees.update(overrides)
     return enseignant_service.creer_enseignant(**donnees)
 

@@ -47,6 +47,9 @@ from services.reinitialisation_service import (
     TABLES_CONSERVEES,
 )
 
+# Cas de référence officiel : vacataire, taxe de 5 %.
+pytestmark = pytest.mark.taxe_historique
+
 MDP_ADMIN = "Admin-Paie-2026!"
 MDP_GESTION = "Gestion-Paie-2026!"
 MDP_LECTURE = "Lecture-Paie-2026!"
@@ -231,7 +234,7 @@ def test_application_reste_utilisable_apres_reinitialisation(env):
     assert _reinitialiser(env, admin.id).reussie
 
     enseignant = enseignant_service.creer_enseignant(
-        nom="Mbarga", prenom="Alice", sexe="F", statut="P", taux_horaire=2000, db_path=db
+        nom="Mbarga", prenom="Alice", sexe="F", statut="V", taux_horaire=2000, db_path=db
     )
     periode = periode_service.creer_periode(mois=10, annee=2030, db_path=db)
     periode_service.ouvrir_periode(periode.id, db_path=db)

@@ -21,7 +21,7 @@ NOM_APPLICATION = "Gestion des Salaires"
 # Auteur et contact affichés sur la page « À propos ».
 AUTEUR = "Daniel Tchomtchi"
 CONTACT_AUTEUR = "tchomtchidaniel@gmail.com"
-VERSION = "1.5.0"
+VERSION = "1.6.0"
 
 # Racine des ressources de l'application (lecture seule une fois installée :
 # templates, schéma SQL). Consciente de PyInstaller (module 20) — voir
@@ -78,14 +78,14 @@ def chemin_modele_standard(nom_fichier: str) -> Path:
     propre = MODELES_ETABLISSEMENT_DIR / nom_fichier
     return propre if propre.exists() else BASE_DIR / "templates" / nom_fichier
 
-# Taux de taxe par défaut appliqué sur la base taxable (5 %).
-# C'est la valeur initiale : l'administrateur peut définir un autre taux
-# (ex. 5,5 %) dans Administration › Paramètres ; chaque période conserve
+# Taux de taxe par défaut appliqué sur la base taxable des VACATAIRES
+# (5,5 % ; les permanents ne sont pas taxés). C'est la valeur initiale :
+# l'administrateur peut définir un autre taux dans Administration › Paramètres ; chaque période conserve
 # son propre taux, figé à la validation (services/parametres_paie_service.py).
 # Decimal, jamais float : ce taux est utilisé directement dans des
 # calculs monétaires par services/paie_service.py (moteur de calcul de
 # paie) et ne doit jamais introduire d'imprécision flottante.
-TAUX_TAXE = Decimal("0.05")
+TAUX_TAXE = Decimal("0.055")
 
 # ---------------------------------------------------------------------
 # En-tête institutionnelle du bulletin de solde (module 07)

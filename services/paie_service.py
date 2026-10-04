@@ -11,11 +11,14 @@ FORMULES (dans cet ordre)
 2. Gain heures        = total_heures × taux_horaire
 3. Base taxable        = gain_heures + prime_ap_pp + surveillance_secretariat
                           + indemnite_suggestion_admin
-4. Taxe                 = base_taxable × taux de taxe de la période
-                          (periodes_paie.taux_taxe : 5 % par défaut,
-                          config.settings.TAUX_TAXE ; paramétrable par
-                          l'administrateur, figé à la validation — cf.
-                          services/parametres_paie_service.py)
+4. Taxe                 = base_taxable × taux de taxe de la période,
+                          pour les VACATAIRES uniquement ; 0 pour un
+                          permanent (periodes_paie.taux_taxe : 5,5 % par
+                          défaut, config.settings.TAUX_TAXE ; paramétrable
+                          par l'administrateur, figé à la validation — cf.
+                          services/parametres_paie_service.py). Les périodes
+                          validées avant la version 1.6.0 gardent l'ancienne
+                          règle (periodes_paie.taxe_permanents = 1).
 5. Net à percevoir      = base_taxable - taxe_5 - retenue_amicale - dette
 
 PRÉCISION MONÉTAIRE
@@ -69,7 +72,7 @@ from typing import Dict, List, Optional, Union
 from config.settings import TAUX_TAXE
 from database.repositories import enseignant_repository, periode_repository
 from utils.validators import message_fiche_incomplete
-from models.enums import StatutPeriode
+from models.enums import StatutEnseignant, StatutPeriode
 from models.resultat_paie import ResultatPaie
 from services import heures_service, licence_service, remuneration_service, retenue_service
 from utils.money import arrondir_fcfa
@@ -162,7 +165,10 @@ def calculer_paie_enseignant(periode_id: int, enseignant_id: int, db_path: DbPat
     remuneration = remuneration_service.obtenir_remuneration_enseignant(periode_id, enseignant_id, db_path=db_path)
     retenues = retenue_service.obtenir_retenues_enseignant(periode_id, enseignant_id, db_path=db_path)
 
-    return _calculer_resultat(periode.id, enseignant, heures, remuneration, retenues, taux_taxe=periode.taux_taxe)
+    return _calculer_resultat(
+        periode.id, enseignant, heures, remuneration, retenues,
+        taux_taxe=periode.taux_taxe, taxe_permanents=periode.taxe_permanents,
+    )
 
 
 def _calculer_resultat(
@@ -172,6 +178,7 @@ def _calculer_resultat(
     remuneration: Dict[str, int],
     retenues: Dict[str, int],
     taux_taxe: Decimal = TAUX_TAXE,
+    taxe_permanents: bool = False,
 ) -> ResultatPaie:
     """
     Applique les 5 formules officielles à des données déjà lues.
@@ -201,8 +208,11 @@ def _calculer_resultat(
     )
     base_taxable = arrondir_fcfa(base_taxable_decimal)
 
-    # 4. Taxe (taux propre à la période ; 5 % par défaut = config.settings.TAUX_TAXE)
+    # 4. Taxe (taux propre à la période ; 5,5 % par défaut = config.settings.TAUX_TAXE),
+    #    due par les vacataires seulement (sauf ancienne règle d'une période validée).
     taux_taxe = Decimal(str(taux_taxe))
+    if enseignant.statut != StatutEnseignant.VACATAIRE and not taxe_permanents:
+        taux_taxe = Decimal("0")
     taxe_decimal = base_taxable_decimal * taux_taxe
     taxe_5 = arrondir_fcfa(taxe_decimal)
 

@@ -26,3 +26,21 @@ def licence_active_pour_les_tests(request, monkeypatch):
     from services import licence_service
 
     monkeypatch.setattr(licence_service, "licence_active", lambda: True)
+
+
+@pytest.fixture(autouse=True)
+def taux_de_taxe_historique(request, monkeypatch):
+    """
+    Tests marqués « taxe_historique » : taux par défaut de 5 %, celui du cas de
+    référence officiel (100 h à 2 000 FCFA -> taxe 11 750, net 208 250), pour
+    vérifier que chaque service restitue exactement les montants du moteur de
+    calcul. Le taux de 5,5 % et la règle « vacataires uniquement » sont
+    vérifiés dans tests/test_taxe_vacataires.py.
+    """
+    if "taxe_historique" not in request.keywords:
+        return
+    from decimal import Decimal
+
+    from services import parametres_paie_service
+
+    monkeypatch.setattr(parametres_paie_service, "TAUX_TAXE", Decimal("0.05"))

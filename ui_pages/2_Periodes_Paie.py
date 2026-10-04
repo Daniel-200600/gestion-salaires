@@ -28,7 +28,7 @@ from services.periode_service import (
     obtenir_periode,
     ouvrir_periode,
 )
-from utils.formatters import LIBELLES_STATUT_PERIODE, NOMS_MOIS, libelle_statut_periode
+from utils.formatters import LIBELLES_STATUT_PERIODE, NOMS_MOIS, formater_taxe_periode, libelle_statut_periode
 from utils.ui_helpers import badge_statut_periode
 from services.parametres_paie_service import (
     ParametrePaieError,
@@ -75,8 +75,8 @@ with st.expander("Créer une période", expanded=False):
         mois_numero = NOMS_MOIS.index(mois_libelle) + 1
         st.caption(
             f"Libellé généré automatiquement : **{mois_libelle} {int(annee)}** · "
-            f"taux de taxe appliqué : **{formater_taux(obtenir_taux_taxe_defaut())}** "
-            "(taux par défaut, réglable dans Administration › Paramètres)"
+            f"taux de taxe des vacataires : **{formater_taux(obtenir_taux_taxe_defaut())}** "
+            "(taux par défaut, réglable dans Administration › Paramètres ; aucune taxe pour les permanents)"
         )
 
         soumis = st.form_submit_button("Créer la période", disabled=not peut_gerer_periode)
@@ -123,7 +123,7 @@ else:
             "Mois": p.mois,
             "Année": p.annee,
             "Statut": libelle_statut_periode(p.statut),
-            "Taux de taxe": formater_taux(p.taux_taxe),
+            "Taxe": formater_taxe_periode(p),
             "Date de création": p.date_creation,
             "Date de clôture": p.date_cloture or "—",
         }
@@ -151,8 +151,8 @@ else:
 
     # --- Taux de taxe de la période -------------------------------------
     if taux_periode_modifiable(periode_selectionnee):
-        st.write(f"Taux de taxe de la période : **{formater_taux(periode_selectionnee.taux_taxe)}** "
-                 "(modifiable jusqu'à la validation, puis figé).")
+        st.write(f"Taux de taxe de la période : **{formater_taux(periode_selectionnee.taux_taxe)}**, appliqué "
+                 "aux vacataires uniquement (modifiable jusqu'à la validation, puis figé).")
         if peut_regler_taux:
             with st.form(f"form_taux_{periode_id}"):
                 pourcentage = st.number_input(
@@ -169,8 +169,8 @@ else:
                     except (ParametrePaieError, AutorisationRefuseeError) as erreur:
                         st.error(str(erreur))
     else:
-        st.write(f"Taux de taxe de la période : **{formater_taux(periode_selectionnee.taux_taxe)}** "
-                 "(figé : période validée ou clôturée).")
+        st.write(f"Taxe de la période : **{formater_taxe_periode(periode_selectionnee)}** "
+                 "(figée : période validée ou clôturée).")
 
     if periode_selectionnee.statut == StatutPeriode.BROUILLON:
         col_ouvrir, col_modifier = st.columns(2)

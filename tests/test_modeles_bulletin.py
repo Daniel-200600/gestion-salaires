@@ -42,6 +42,9 @@ from templates import build_template
 from utils.balises_bulletin import BALISES, valeurs_exemple
 from utils.detection_bulletin import suggerer_correspondances
 
+# Cas de référence officiel : vacataire, taxe de 5 %.
+pytestmark = pytest.mark.taxe_historique
+
 RACINE = Path(__file__).resolve().parent.parent
 MDP = "Motdepasse-Solide-1"
 STANDARD = set(build_template.BALISES_MODELE_PDF_STANDARD)
@@ -218,7 +221,8 @@ def test_import_pdf_a_balises_alignements_et_texte_fixe():
     modele_bulletin_service.importer_modele("PDF balisé", _pdf_a_balises(), "modele.pdf", activer=True)
     e, p = _periode_validee_avec_enseignant(statut="P")
     texte = pdf_export.texte_pdf(bulletin_service.generer_bulletin_enseignant(p.id, e.id).chemin.read_bytes())
-    assert "Statut: P" in texte and "MBARGA ÉLISE" in texte and "17100" in texte and "{{" not in texte
+    # Permanent : aucune taxe, net = 10 h × 1 800 FCFA.
+    assert "Statut: P" in texte and "MBARGA ÉLISE" in texte and "18000" in texte and "{{" not in texte
 
 
 def test_balises_historiques_acceptees():

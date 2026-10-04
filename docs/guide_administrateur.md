@@ -69,7 +69,9 @@ Onglet **Journaux** : dernières lignes du journal technique, avec recherche. Ce
 
 Onglet **Paramètres**, rubrique **Paramètres de paie**.
 
-- **Taux par défaut** : saisissez le taux en pourcentage (par exemple `5,5` pour 5 % d'impôt et 10 % de centimes additionnels), puis **Enregistrer le taux**. Tant qu'il n'a jamais été modifié, il vaut 5 %. Il est recopié sur chaque période créée ensuite ; il ne modifie aucune période existante.
+La taxe s'applique aux **vacataires uniquement** ; les permanents n'en paient pas. Les périodes validées ou clôturées avant la version 1.6.0 gardent la règle avec laquelle elles ont été calculées (taxe appliquée à tous), figée elle aussi.
+
+- **Taux par défaut** : saisissez le taux en pourcentage (par exemple `5,5` pour 5 % d'impôt et 10 % de centimes additionnels), puis **Enregistrer le taux**. Tant qu'il n'a jamais été modifié, il vaut 5,5 %. Il est recopié sur chaque période créée ensuite ; il ne modifie aucune période existante.
 - **Appliquer aussi aux périodes en brouillon ou ouvertes** : case à cocher du même formulaire ; les périodes validées ou clôturées ne sont jamais touchées.
 - **Taux d'une période** : page **Gestion › Périodes de paie**, période sélectionnée, **Appliquer ce taux à la période** (brouillon ou ouverte uniquement).
 - **Figé à la validation** : une fois la période validée, son taux ne peut plus changer, ni depuis l'interface ni par une modification directe de la base (règle de protection SQL). Un bulletin validé ou clôturé est donc toujours recalculé à l'identique.

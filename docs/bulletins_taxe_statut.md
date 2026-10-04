@@ -70,3 +70,15 @@ modèle, changement du taux par défaut.
 français de la période dans le bulletin ; le bulletin officiel l'écrit en
 anglais (« SEPTEMBER 2030 »). Nouveaux fichiers : `test_taux_taxe.py`,
 `test_modeles_bulletin.py`, `test_statut_enseignant.py`.
+
+## Taxe réservée aux vacataires (version 1.6.0)
+
+- `services/paie_service.py` : taxe = base taxable × taux de la période pour un
+  vacataire, 0 pour un permanent (`ResultatPaie.taux_taxe` vaut alors 0).
+- Taux par défaut : `config.settings.TAUX_TAXE = Decimal("0.055")`.
+- Colonne `periodes_paie.taxe_permanents` : 1 = ancienne règle (taxe pour tous).
+  La migration l'ajoute avec la valeur 1 (aucune ligne modifiée, une période
+  clôturée ne l'est jamais), puis passe à 0 les périodes en brouillon ou ouvertes.
+  Trigger `trg_periodes_paie_regle_taxe_figee` : la règle d'une période validée
+  ou clôturée ne change plus.
+- Tests : `tests/test_taxe_vacataires.py`.

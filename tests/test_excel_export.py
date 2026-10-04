@@ -20,6 +20,9 @@ from exports import excel_export
 from services import comptabilite_service, donnees_paie_service, enseignant_service, periode_service
 from services.donnees_paie_service import DonneesPaieEnseignant
 
+# Cas de référence officiel : vacataire, taxe de 5 %.
+pytestmark = pytest.mark.taxe_historique
+
 
 @pytest.fixture(autouse=True)
 def _rediriger_connexion_par_defaut(db_path, monkeypatch):
@@ -34,7 +37,7 @@ def dossier_export(tmp_path):
 
 
 def _creer_enseignant(**overrides):
-    donnees = {"nom": "Sissoko", "prenom": "Modibo", "sexe": "M", "statut": "P", "taux_horaire": 1000}
+    donnees = {"nom": "Sissoko", "prenom": "Modibo", "sexe": "M", "statut": "V", "taux_horaire": 1000}
     donnees.update(overrides)
     return enseignant_service.creer_enseignant(**donnees)
 
@@ -64,7 +67,7 @@ def _trouver_ligne_entete(feuille, premiere_colonne_attendue: str) -> int:
 
 def _etat_exemple_enonce():
     """Reproduit exactement l'exemple chiffré de l'énoncé (net attendu = 208250)."""
-    e = _creer_enseignant(nom="Kamgang", prenom="Paul", statut="P", taux_horaire=2000)
+    e = _creer_enseignant(nom="Kamgang", prenom="Paul", statut="V", taux_horaire=2000)
     p = _creer_periode_ouverte()
     _saisir_donnees(
         p.id, e.id,
@@ -170,7 +173,7 @@ def test_noms_prenoms_statuts_corrects(dossier_export):
     assert feuille.cell(row=ligne_donnees, column=2).value == "Kamgang"
     assert feuille.cell(row=ligne_donnees, column=3).value == "Paul"
     assert feuille.cell(row=ligne_donnees, column=4).value == "Masculin"
-    assert feuille.cell(row=ligne_donnees, column=5).value == "Permanent"
+    assert feuille.cell(row=ligne_donnees, column=5).value == "Vacataire"
 
 
 # ---------------------------------------------------------------------

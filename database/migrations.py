@@ -117,7 +117,22 @@ COLONNES_AJOUTEES = (
         "taux_taxe TEXT NOT NULL DEFAULT '0.05' "
         "CHECK (CAST(taux_taxe AS REAL) >= 0 AND CAST(taux_taxe AS REAL) < 1)",
     ),
+    # Taxe réservée aux vacataires : les périodes existantes reçoivent
+    # l'ancienne règle (1 = permanents taxés aussi), sans aucune mise à
+    # jour de ligne — une période clôturée n'est jamais modifiée.
+    (
+        "periodes_paie",
+        "taxe_permanents",
+        "taxe_permanents INTEGER NOT NULL DEFAULT 1 CHECK (taxe_permanents IN (0, 1))",
+    ),
 )
+
+# Après l'ajout d'une colonne : les périodes encore modifiables (brouillon,
+# ouverte) passent tout de suite à la nouvelle règle.
+APRES_AJOUT = {
+    ("periodes_paie", "taxe_permanents"):
+        "UPDATE periodes_paie SET taxe_permanents = 0 WHERE statut IN ('brouillon', 'ouverte')",
+}
 
 
 def _colonnes_table(conn: sqlite3.Connection, nom_table: str) -> set:
@@ -145,6 +160,8 @@ def ajouter_colonnes_manquantes(conn: sqlite3.Connection) -> list:
         if colonne in _colonnes_table(conn, table):
             continue
         conn.execute(f"ALTER TABLE {table} ADD COLUMN {definition}")
+        if (table, colonne) in APRES_AJOUT:
+            conn.execute(APRES_AJOUT[(table, colonne)])
         ajoutees.append(f"{table}.{colonne}")
         logger.info("Migration : colonne %s.%s ajoutée.", table, colonne)
     if ajoutees:

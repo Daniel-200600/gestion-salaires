@@ -127,6 +127,12 @@ def nettoyer_nom_fichier(valeur: str) -> str:
     return nettoye or "sans_nom"
 
 
+def formater_taxe_periode(periode) -> str:
+    """Taux et règle de la taxe d'une période : « 5,5 %, vacataires »."""
+    regle = "tous les enseignants" if getattr(periode, "taxe_permanents", False) else "vacataires"
+    return f"{formater_taux_taxe(periode.taux_taxe)}, {regle}"
+
+
 def formater_taux_taxe(taux) -> str:
     """Taux de taxe (fraction) en pourcentage lisible : Decimal("0.055") -> « 5,5 % »."""
     from decimal import Decimal

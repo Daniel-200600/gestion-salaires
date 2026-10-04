@@ -16,7 +16,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 import streamlit as st
 
-from utils.formatters import formater_taux_taxe
+from utils.formatters import formater_taxe_periode
 
 from database.initialization import init_database
 from exports.excel_export import generer_fichier_excel, generer_nom_fichier
@@ -122,7 +122,7 @@ st.dataframe(lignes_apercu, use_container_width=True, hide_index=True)
 
 col_t1, col_t2, col_t3 = st.columns(3)
 col_t1.metric("Total heures", f"{etat.totaux.total_heures:g} h")
-col_t2.metric(f"Total taxe ({formater_taux_taxe(periode.taux_taxe)})", formater_fcfa(etat.totaux.total_taxe))
+col_t2.metric(f"Total taxe ({formater_taxe_periode(periode)})", formater_fcfa(etat.totaux.total_taxe))
 col_t3.metric("Total net à percevoir", formater_fcfa(etat.totaux.total_net_a_percevoir))
 
 st.divider()

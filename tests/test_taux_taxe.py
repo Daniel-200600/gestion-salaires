@@ -72,17 +72,17 @@ def _cas_reference(periode):
 # Valeur par défaut : rien ne change
 # ---------------------------------------------------------------------
 
-def test_taux_par_defaut_est_5_pourcent():
-    assert TAUX_TAXE == Decimal("0.05")
-    assert parametres_paie_service.obtenir_taux_taxe_defaut() == Decimal("0.05")
-    assert _periode_ouverte().taux_taxe == Decimal("0.05")
+def test_taux_par_defaut_est_5_5_pourcent():
+    assert TAUX_TAXE == Decimal("0.055")
+    assert parametres_paie_service.obtenir_taux_taxe_defaut() == Decimal("0.055")
+    assert _periode_ouverte().taux_taxe == Decimal("0.055")
 
 
-def test_cas_de_reference_inchange_208250():
+def test_cas_de_reference_vacataire_207075():
     periode = _periode_ouverte()
     e = _cas_reference(periode)
     resultat = paie_service.calculer_paie_enseignant(periode.id, e.id)
-    assert (resultat.taxe_5, resultat.net_a_percevoir, resultat.taux_taxe) == (11750, 208250, Decimal("0.05"))
+    assert (resultat.taxe_5, resultat.net_a_percevoir, resultat.taux_taxe) == (12925, 207075, Decimal("0.055"))
 
 
 # ---------------------------------------------------------------------
@@ -103,10 +103,10 @@ def test_bulletin_officiel_reproduit_avec_5_5_pourcent():
 
 def test_changer_le_taux_par_defaut_ne_modifie_aucune_periode_existante():
     ancienne = _periode_ouverte(mois=6)
-    parametres_paie_service.definir_taux_taxe_defaut(Decimal("5.5"))
+    parametres_paie_service.definir_taux_taxe_defaut(Decimal("6"))
     nouvelle = _periode_ouverte(mois=7)
-    assert periode_service.obtenir_periode(ancienne.id).taux_taxe == Decimal("0.05")
-    assert nouvelle.taux_taxe == Decimal("0.055")
+    assert periode_service.obtenir_periode(ancienne.id).taux_taxe == Decimal("0.055")
+    assert nouvelle.taux_taxe == Decimal("0.06")
 
 
 # ---------------------------------------------------------------------
@@ -129,11 +129,11 @@ def test_taux_fige_apres_validation_et_resultats_stables():
     avant = paie_service.calculer_paie_enseignant(periode.id, e.id)
 
     with pytest.raises(ParametrePaieError, match="figé"):
-        parametres_paie_service.definir_taux_taxe_periode(periode.id, "5.5")
-    parametres_paie_service.definir_taux_taxe_defaut("5.5")  # n'affecte pas la période validée
+        parametres_paie_service.definir_taux_taxe_periode(periode.id, "6")
+    parametres_paie_service.definir_taux_taxe_defaut("6")  # n'affecte pas la période validée
 
     apres = paie_service.calculer_paie_enseignant(periode.id, e.id)
-    assert (apres.taxe_5, apres.net_a_percevoir) == (avant.taxe_5, avant.net_a_percevoir) == (11750, 208250)
+    assert (apres.taxe_5, apres.net_a_percevoir) == (avant.taxe_5, avant.net_a_percevoir) == (12925, 207075)
 
 
 def test_trigger_sql_bloque_la_modification_directe_du_taux_d_une_periode_validee(db_path):
@@ -142,7 +142,7 @@ def test_trigger_sql_bloque_la_modification_directe_du_taux_d_une_periode_valide
     conn = sqlite3.connect(db_path)
     try:
         with pytest.raises(sqlite3.IntegrityError, match="fige"):
-            conn.execute("UPDATE periodes_paie SET taux_taxe = '0.055' WHERE id = ?", (periode.id,))
+            conn.execute("UPDATE periodes_paie SET taux_taxe = '0.06' WHERE id = ?", (periode.id,))
     finally:
         conn.close()
 
@@ -163,17 +163,17 @@ def test_conversion_et_affichage(saisie, taux, texte):
 
 
 def test_modifications_journalisees(db_path):
-    parametres_paie_service.definir_taux_taxe_defaut("5.5", utilisateur="admin")
+    parametres_paie_service.definir_taux_taxe_defaut("6", utilisateur="admin")
     periode = periode_service.creer_periode(mois=9, annee=2026)
-    parametres_paie_service.definir_taux_taxe_periode(periode.id, "6", utilisateur="admin")
+    parametres_paie_service.definir_taux_taxe_periode(periode.id, "6.5", utilisateur="admin")
     conn = sqlite3.connect(db_path)
     lignes = conn.execute(
         "SELECT entite, utilisateur, details FROM audit_log WHERE type_action = ?",
         (TypeActionAudit.PARAMETRE_PAIE_MODIFIE.value,),
     ).fetchall()
     conn.close()
-    assert ("parametres_paie", "admin", "Taux de taxe par défaut : 5 % -> 5,5 %") in lignes
-    assert any(entite == "periode" and "5,5 % -> 6 %" in details for entite, _u, details in lignes)
+    assert ("parametres_paie", "admin", "Taux de taxe par défaut : 5,5 % -> 6 %") in lignes
+    assert any(entite == "periode" and "6 % -> 6,5 %" in details for entite, _u, details in lignes)
 
 
 # ---------------------------------------------------------------------
@@ -183,10 +183,9 @@ def test_modifications_journalisees(db_path):
 def test_migration_base_existante_sans_colonne_taux(tmp_path):
     chemin = tmp_path / "ancienne.db"
     schema = SCHEMA_PATH.read_text(encoding="utf-8")
-    ancien_schema = schema.replace(
-        """    taux_taxe       TEXT    NOT NULL DEFAULT '0.05'
-                        CHECK (CAST(taux_taxe AS REAL) >= 0 AND CAST(taux_taxe AS REAL) < 1),
-""", "")
+    debut_colonnes = schema.index("    taux_taxe       TEXT    NOT NULL DEFAULT")
+    fin_colonnes = schema.index("    UNIQUE (mois, annee),")
+    ancien_schema = schema[:debut_colonnes] + schema[fin_colonnes:]  # sans taux_taxe ni taxe_permanents
     debut = ancien_schema.index("-- Le taux de taxe d'une période validée")
     fin = ancien_schema.index("-- Seule une période encore en brouillon")
     ancien_schema = ancien_schema[:debut] + ancien_schema[fin:]
@@ -227,12 +226,12 @@ def comptes(db_path):
 def test_non_admin_refuse_meme_en_appel_direct(comptes, role, db_path):
     periode = periode_service.creer_periode(mois=10, annee=2026)
     with pytest.raises(AutorisationRefuseeError):
-        administration_service.definir_taux_taxe_defaut(comptes[role].id, "5.5", db_path=db_path)
+        administration_service.definir_taux_taxe_defaut(comptes[role].id, "6", db_path=db_path)
     with pytest.raises(AutorisationRefuseeError):
-        administration_service.definir_taux_taxe_periode(comptes[role].id, periode.id, "5.5", db_path=db_path)
-    assert parametres_paie_service.obtenir_taux_taxe_defaut(db_path=db_path) == Decimal("0.05")
+        administration_service.definir_taux_taxe_periode(comptes[role].id, periode.id, "6", db_path=db_path)
+    assert parametres_paie_service.obtenir_taux_taxe_defaut(db_path=db_path) == Decimal("0.055")
 
 
 def test_admin_autorise(comptes, db_path):
-    administration_service.definir_taux_taxe_defaut(comptes[RoleUtilisateur.ADMIN].id, "5.5", db_path=db_path)
-    assert parametres_paie_service.obtenir_taux_taxe_defaut(db_path=db_path) == Decimal("0.055")
+    administration_service.definir_taux_taxe_defaut(comptes[RoleUtilisateur.ADMIN].id, "6", db_path=db_path)
+    assert parametres_paie_service.obtenir_taux_taxe_defaut(db_path=db_path) == Decimal("0.06")

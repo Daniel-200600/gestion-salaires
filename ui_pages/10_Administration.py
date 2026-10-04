@@ -204,13 +204,14 @@ with onglet_parametres:
     st.subheader("Paramètres de paie")
     taux_defaut = parametres_paie_service.obtenir_taux_taxe_defaut()
     col_taux, col_devise_calc, col_semaines = st.columns(3)
-    col_taux.metric("Taux de taxe par défaut", parametres_paie_service.formater_taux(taux_defaut))
+    col_taux.metric("Taxe des vacataires (par défaut)", parametres_paie_service.formater_taux(taux_defaut))
     col_devise_calc.metric("Devise de calcul", "FCFA")
     from config.settings import NB_SEMAINES_PAR_PERIODE
     col_semaines.metric("Semaines par période", NB_SEMAINES_PAR_PERIODE)
 
     st.markdown("**Taux de taxe**")
     st.caption(
+        "La taxe s'applique aux vacataires uniquement : les permanents n'en paient pas. "
         "Le taux par défaut est recopié sur chaque nouvelle période. Le taux d'une période reste "
         "ajustable (Gestion › Périodes de paie) tant qu'elle n'est pas validée, puis il est figé : "
         "les bulletins validés ou clôturés sont toujours recalculés à l'identique. Modifier le taux "

@@ -85,8 +85,13 @@ CREATE TABLE IF NOT EXISTS periodes_paie (
     -- pour 5,5 %). Initialisé au taux par défaut en vigueur à la création
     -- (table parametres_paie), modifiable tant que la période n'est pas
     -- validée, puis figé (trigger trg_periodes_paie_taux_fige).
-    taux_taxe       TEXT    NOT NULL DEFAULT '0.05'
+    taux_taxe       TEXT    NOT NULL DEFAULT '0.055'
                         CHECK (CAST(taux_taxe AS REAL) >= 0 AND CAST(taux_taxe AS REAL) < 1),
+    -- Règle de taxe : la taxe ne s'applique qu'aux vacataires (0). Les
+    -- périodes validées ou clôturées avant ce changement ont été calculées
+    -- avec la taxe appliquée aussi aux permanents (1) : elles la gardent,
+    -- pour que leurs montants restent strictement identiques.
+    taxe_permanents INTEGER NOT NULL DEFAULT 0 CHECK (taxe_permanents IN (0, 1)),
     UNIQUE (mois, annee),
     -- date_cloture est renseignee si et seulement si la periode est CLOTUREE
     CHECK (
@@ -126,6 +131,15 @@ FOR EACH ROW
 WHEN OLD.statut IN ('validee', 'cloturee') AND NEW.taux_taxe IS NOT OLD.taux_taxe
 BEGIN
     SELECT RAISE(ABORT, 'Taux de taxe fige : la periode est validee ou cloturee');
+END;
+
+-- La règle de taxe d'une période validée ne change plus (clôturée : déjà figée).
+CREATE TRIGGER IF NOT EXISTS trg_periodes_paie_regle_taxe_figee
+BEFORE UPDATE OF taxe_permanents ON periodes_paie
+FOR EACH ROW
+WHEN OLD.statut IN ('validee', 'cloturee') AND NEW.taxe_permanents IS NOT OLD.taxe_permanents
+BEGIN
+    SELECT RAISE(ABORT, 'Regle de taxe figee : la periode est validee ou cloturee');
 END;
 
 -- Seule une période encore en brouillon peut être supprimée

@@ -18,6 +18,9 @@ from services import (
 )
 from services.donnees_paie_service import DonneesPaieEnseignant
 
+# Cas de référence officiel : vacataire, taxe de 5 %.
+pytestmark = pytest.mark.taxe_historique
+
 
 @pytest.fixture(autouse=True)
 def _rediriger_connexion_par_defaut(db_path, monkeypatch):
@@ -138,7 +141,7 @@ def test_nouveau_mot_de_passe_correctement_hashe_scrypt(db_path):
 # ---------------------------------------------------------------------
 
 def test_enseignants_preserves_apres_reinitialisation_comptes():
-    e = enseignant_service.creer_enseignant(nom="Kamgang", prenom="Jean", sexe="M", statut="P", taux_horaire=2000)
+    e = enseignant_service.creer_enseignant(nom="Kamgang", prenom="Jean", sexe="M", statut="V", taux_horaire=2000)
     _creer_utilisateur()
     utilisateur_service.reinitialiser_tous_les_comptes(confirmation=True)
 
@@ -147,7 +150,7 @@ def test_enseignants_preserves_apres_reinitialisation_comptes():
 
 
 def test_periodes_et_donnees_paie_preservees_apres_reinitialisation_comptes():
-    e = enseignant_service.creer_enseignant(nom="Kamgang", prenom="Jean", sexe="M", statut="P", taux_horaire=2000)
+    e = enseignant_service.creer_enseignant(nom="Kamgang", prenom="Jean", sexe="M", statut="V", taux_horaire=2000)
     p = periode_service.creer_periode(mois=8, annee=2026)
     controle_paie_service.ouvrir_periode_avec_audit(p.id)
     donnees_paie_service.enregistrer_donnees_paie_groupe(p.id, [

@@ -6,7 +6,7 @@ Fonctionnement
 - Un **taux par défaut** (table parametres_paie, clé `taux_taxe_defaut`)
   est appliqué à chaque NOUVELLE période au moment de sa création.
   Tant qu'il n'a jamais été modifié, il vaut config.settings.TAUX_TAXE
-  (5 %), la valeur historique de l'application.
+  (5,5 %). La taxe ne s'applique qu'aux vacataires (services/paie_service.py).
 - Chaque période porte **son propre taux** (colonne periodes_paie.taux_taxe).
   Il peut être ajusté tant que la période est en brouillon ou ouverte,
   puis il est **figé** dès la validation (contrôle ici et trigger SQL).
@@ -82,7 +82,7 @@ def formater_taux(taux: Decimal) -> str:
 
 
 def obtenir_taux_taxe_defaut(db_path: DbPath = None) -> Decimal:
-    """Taux appliqué aux nouvelles périodes. 5 % (config.settings.TAUX_TAXE) tant qu'il n'a pas été modifié."""
+    """Taux appliqué aux nouvelles périodes. 5,5 % (config.settings.TAUX_TAXE) tant qu'il n'a pas été modifié."""
     valeur = parametres_paie_repository.lire(CLE_TAUX_TAXE_DEFAUT, db_path=db_path)
     if valeur is None:
         return TAUX_TAXE

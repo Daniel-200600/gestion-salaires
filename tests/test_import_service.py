@@ -17,6 +17,9 @@ from services import (
 )
 from services.import_service import ImportServiceError
 
+# Cas de référence officiel : vacataire, taxe de 5 %.
+pytestmark = pytest.mark.taxe_historique
+
 
 @pytest.fixture(autouse=True)
 def _rediriger_connexion_par_defaut(db_path, monkeypatch):
@@ -24,7 +27,7 @@ def _rediriger_connexion_par_defaut(db_path, monkeypatch):
 
 
 def _creer_enseignant(**overrides):
-    donnees = {"nom": "Kamgang", "prenom": "Jean", "sexe": "M", "statut": "P", "taux_horaire": 2000}
+    donnees = {"nom": "Kamgang", "prenom": "Jean", "sexe": "M", "statut": "V", "taux_horaire": 2000}
     donnees.update(overrides)
     return enseignant_service.creer_enseignant(**donnees)
 
@@ -382,7 +385,7 @@ def test_audit_import_reussi(tmp_path, db_path):
 # ---------------------------------------------------------------------
 
 def test_cas_reference_apres_import(tmp_path):
-    df = pd.DataFrame({"Nom": ["Kamgang"], "Prenom": ["Jean Paul"], "Sexe": ["M"], "Statut": ["P"], "taux_horaire": [2000]})
+    df = pd.DataFrame({"Nom": ["Kamgang"], "Prenom": ["Jean Paul"], "Sexe": ["M"], "Statut": ["V"], "taux_horaire": [2000]})
     contenu = import_service.lire_fichier(_fichier_xlsx(tmp_path, df), "test.xlsx")
     analyse = import_service.analyser_fichier(contenu, TypeImport.ENSEIGNANTS)
     rapport = import_service.preparer_import_enseignants(analyse, contenu.feuilles[analyse.feuille_choisie])
