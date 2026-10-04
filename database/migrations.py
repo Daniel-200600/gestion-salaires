@@ -125,6 +125,14 @@ COLONNES_AJOUTEES = (
         "taxe_permanents",
         "taxe_permanents INTEGER NOT NULL DEFAULT 1 CHECK (taxe_permanents IN (0, 1))",
     ),
+    # Salaire mensuel fixe des permanents (version 1.7.0) : vide pour tous
+    # les enseignants existants, dont le calcul reste donc inchangé.
+    (
+        "enseignants",
+        "salaire_fixe",
+        "salaire_fixe INTEGER NULL CHECK (salaire_fixe IS NULL OR salaire_fixe >= 0) "
+        "CHECK (salaire_fixe IS NULL OR salaire_fixe = CAST(salaire_fixe AS INTEGER))",
+    ),
 )
 
 # Après l'ajout d'une colonne : les périodes encore modifiables (brouillon,

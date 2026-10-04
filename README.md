@@ -1,4 +1,4 @@
-# Gestion des Salaires — v1.6.0
+# Gestion des Salaires — v1.7.0
 
 [![tests](https://github.com/Daniel-200600/gestion-salaires/actions/workflows/tests.yml/badge.svg)](https://github.com/Daniel-200600/gestion-salaires/actions/workflows/tests.yml)
 ![Python](https://img.shields.io/badge/python-3.11-blue)
@@ -19,7 +19,8 @@ Couvre l'intégralité du cycle de paie : gestion des enseignants et des périod
 - Bulletins de solde identiques au bulletin officiel de l'établissement, en Word ou en PDF
 - Modèles de bulletin importables (Word ou PDF, bulletin rempli ou modèle à balises)
 - Taxe réservée aux vacataires, taux paramétrable (5,5 % par défaut, figé par période à la validation)
-- Changement de statut d'un enseignant (vacataire / permanent), journalisé
+- Changement de statut d'un enseignant (vacataire / permanent), journalisé ; salaire mensuel fixe pour les permanents payés au mois
+- Import du fichier de paie mensuel (classeur Excel heures / informations / état comptable), avec contrôle des écarts et tableau de correction avant validation
 - Licence d'utilisation par clé signée, liée à l'ordinateur (mode démonstration limité à 5 enseignants sans licence) ; les clés sont créées par l'auteur avec `outils/generer_licence.py`, à partir d'une clé privée conservée hors du projet
 - Reprise d'une liste d'enseignants existante (Excel, CSV, Word ou PDF), détection des doublons probables ; les informations manquantes se complètent plus tard, une par une ou toutes ensemble, les fiches incomplètes restant hors de la paie
 - Exports comptables (Excel)
@@ -83,7 +84,7 @@ Sauvegarde via l'API native SQLite (`sqlite3.Connection.backup()`), jamais une s
 
 ## Version
 
-**1.6.0** — voir `config/settings.py` (`VERSION`), source unique du numéro de version.
+**1.7.0** — voir `config/settings.py` (`VERSION`), source unique du numéro de version.
 
 ## Tests
 
@@ -91,7 +92,7 @@ Sauvegarde via l'API native SQLite (`sqlite3.Connection.backup()`), jamais une s
 python -m pytest -q
 ```
 
-Résultat de référence : **1588 passed, 3 skipped** (version 1.6.0 ; voir `docs/bulletins_taxe_statut.md`).
+Résultat de référence : **1620 passed, 3 skipped** (version 1.7.0 ; voir `docs/bulletins_taxe_statut.md`).
 
 ## Licence
 

@@ -140,7 +140,8 @@ def _preparer_valeurs_placeholder(resultat: ResultatPaie, periode: Union[Periode
         "SEMAINE_3": _formater_heures(resultat.semaine_3),
         "SEMAINE_4": _formater_heures(resultat.semaine_4),
         "SEMAINE_5": _formater_heures(resultat.semaine_5),
-        "TAUX_HORAIRE": str(resultat.taux_horaire),
+        # Permanent au salaire fixe : pas de taux horaire, le gain est le salaire du mois.
+        "TAUX_HORAIRE": "" if resultat.salaire_fixe is not None else str(resultat.taux_horaire),
         "GAIN_HEURES": str(resultat.gain_heures),
         "PRIME_AP_PP": str(resultat.prime_ap_pp),
         "SURVEILLANCE_SECRETARIAT": str(resultat.surveillance_secretariat),

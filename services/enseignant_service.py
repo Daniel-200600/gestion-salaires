@@ -30,12 +30,13 @@ from database.repositories import audit_log_repository
 from services import licence_service
 from models.audit_log import AuditLog
 from models.enseignant import Enseignant
-from models.enums import TypeActionAudit
+from models.enums import StatutEnseignant, TypeActionAudit
 from utils.validators import (
     EnseignantValidationError,
     nettoyer_champ_optionnel,
     nettoyer_texte,
     valider_nom_ou_prenom,
+    valider_salaire_fixe,
     valider_sexe,
     valider_statut,
     valider_taux_horaire,
@@ -80,19 +81,42 @@ class EnseignantNotFoundError(EnseignantValidationError):
     """
 
 
+MESSAGE_SALAIRE_FIXE_PERMANENTS = "Le salaire mensuel fixe est réservé aux permanents."
+
+# Valeur par défaut de `modifier_enseignant(salaire_fixe=...)` : ne rien changer
+# (None, lui, retire le salaire fixe : l'enseignant est alors payé à l'heure).
+INCHANGE = object()
+
+
+def _salaire_fixe_valide(salaire_fixe, statut) -> Optional[int]:
+    if _vide(salaire_fixe):
+        return None
+    salaire = valider_salaire_fixe(salaire_fixe)
+    if statut != StatutEnseignant.PERMANENT:
+        raise EnseignantValidationError(MESSAGE_SALAIRE_FIXE_PERMANENTS)
+    return salaire
+
+
 def _construire_enseignant_valide(
     nom, prenom, sexe, statut, taux_horaire, email, telephone, adresse,
     enseignant_id: Optional[int] = None,
     actif: bool = True,
+    salaire_fixe=None,
 ) -> Enseignant:
-    """Valide l'ensemble des champs et construit un Enseignant prêt à persister."""
+    """
+    Valide l'ensemble des champs et construit un Enseignant prêt à persister.
+    Un permanent au salaire mensuel fixe peut n'avoir aucun taux horaire.
+    """
+    statut_valide = valider_statut(statut)
+    salaire = _salaire_fixe_valide(salaire_fixe, statut_valide)
     return Enseignant(
         id=enseignant_id,
         nom=valider_nom_ou_prenom(nom, "nom"),
         prenom=valider_nom_ou_prenom(prenom, "prenom"),
         sexe=valider_sexe(sexe),
-        statut=valider_statut(statut),
-        taux_horaire=valider_taux_horaire(taux_horaire),
+        statut=statut_valide,
+        taux_horaire=None if salaire is not None and _vide(taux_horaire) else valider_taux_horaire(taux_horaire),
+        salaire_fixe=salaire,
         email=nettoyer_champ_optionnel(email),
         telephone=nettoyer_champ_optionnel(telephone),
         adresse=nettoyer_champ_optionnel(adresse),
@@ -110,10 +134,11 @@ def creer_enseignant(
     telephone: Optional[str] = None,
     adresse: Optional[str] = None,
     db_path: DbPath = None,
+    salaire_fixe=None,
 ) -> Enseignant:
     """Valide puis crée un nouvel enseignant (actif par défaut)."""
     enseignant = _construire_enseignant_valide(
-        nom, prenom, sexe, statut, taux_horaire, email, telephone, adresse, actif=True
+        nom, prenom, sexe, statut, taux_horaire, email, telephone, adresse, actif=True, salaire_fixe=salaire_fixe
     )
     try:
         licence_service.verifier_ajout_enseignants(1, db_path=db_path)
@@ -165,11 +190,13 @@ def modifier_enseignant(
     adresse: Optional[str] = None,
     db_path: DbPath = None,
     utilisateur: Optional[str] = None,
+    salaire_fixe=INCHANGE,
 ) -> Enseignant:
     """
     Valide puis applique une modification à un enseignant existant. Ne
     touche pas à `actif`. Un changement de statut est journalisé (voir
-    `changer_statut_enseignant`).
+    `changer_statut_enseignant`). `salaire_fixe` : INCHANGE (défaut) le
+    conserve, None le retire, un montant le définit (permanents seulement).
     """
     existant = obtenir_enseignant(enseignant_id, db_path=db_path)  # lève si inexistant
     # Compléter une fiche importée : une information encore inconnue (None)
@@ -187,7 +214,10 @@ def modifier_enseignant(
         telephone=nettoyer_champ_optionnel(telephone),
         adresse=nettoyer_champ_optionnel(adresse),
         actif=existant.actif,
+        salaire_fixe=existant.salaire_fixe,
     )
+    if salaire_fixe is not INCHANGE:
+        enseignant_modifie.salaire_fixe = _salaire_fixe_valide(salaire_fixe, enseignant_modifie.statut)
     enseignant_repository.mettre_a_jour(enseignant_modifie, db_path=db_path)
     if enseignant_modifie.statut != existant.statut:
         _journaliser_changement_statut(existant, enseignant_modifie.statut, utilisateur, db_path)
@@ -221,6 +251,7 @@ class ComplementFiche:
     sexe: object = None
     statut: object = None
     taux_horaire: object = None
+    salaire_fixe: object = None  # permanents payés au mois
 
 
 @dataclass
@@ -252,12 +283,14 @@ def completer_fiches_en_lot(
                 taux_horaire=(existant.taux_horaire if _vide(complement.taux_horaire)
                               else valider_taux_horaire(complement.taux_horaire)),
             )
+            if not _vide(complement.salaire_fixe):
+                modifie = replace(modifie, salaire_fixe=_salaire_fixe_valide(complement.salaire_fixe, modifie.statut))
         except EnseignantValidationError as erreur:
             raise EnseignantValidationError(
                 f"{existant.nom} {existant.prenom}".strip() + f" : {erreur} Aucune fiche n'a été enregistrée."
             ) from erreur
-        if (modifie.sexe, modifie.statut, modifie.taux_horaire) != (
-            existant.sexe, existant.statut, existant.taux_horaire
+        if (modifie.sexe, modifie.statut, modifie.taux_horaire, modifie.salaire_fixe) != (
+            existant.sexe, existant.statut, existant.taux_horaire, existant.salaire_fixe
         ):
             a_ecrire.append((existant, modifie))
 
@@ -277,6 +310,12 @@ def completer_fiches_en_lot(
         nb_fiches_modifiees=len(a_ecrire),
         nb_fiches_completees=sum(1 for _, modifie in a_ecrire if modifie.est_complet),
     )
+
+
+def journaliser_changement_statut(enseignant: Enseignant, nouveau_statut, utilisateur: Optional[str],
+                                  db_path: DbPath = None) -> None:
+    """Inscrit au journal d'audit le changement de statut d'un enseignant (aussi utilisé par les imports)."""
+    _journaliser_changement_statut(enseignant, nouveau_statut, utilisateur, db_path)
 
 
 def _journaliser_changement_statut(enseignant: Enseignant, nouveau_statut, utilisateur: Optional[str],

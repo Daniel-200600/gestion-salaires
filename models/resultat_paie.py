@@ -29,6 +29,7 @@ Seules les heures (semaine_1..5, total_heures) restent en float.
 
 from dataclasses import dataclass
 from decimal import Decimal
+from typing import Optional
 
 from config.settings import TAUX_TAXE
 
@@ -68,3 +69,7 @@ class ResultatPaie:
 
     # Taux de taxe appliqué (fraction, ex. Decimal("0.055")) — celui de la période.
     taux_taxe: Decimal = TAUX_TAXE
+
+    # Salaire mensuel fixe d'un permanent : gain_heures vaut alors ce montant
+    # (taux_horaire vaut 0, les heures restent indicatives).
+    salaire_fixe: Optional[int] = None

@@ -8,7 +8,8 @@ existants (via les services de lecture des modules 02-04).
 FORMULES (dans cet ordre)
 --------------------------
 1. Total heures      = semaine_1 + semaine_2 + semaine_3 + semaine_4 + semaine_5
-2. Gain heures        = total_heures × taux_horaire
+2. Gain heures        = total_heures × taux_horaire, ou salaire mensuel
+                          fixe pour un permanent payé au mois
 3. Base taxable        = gain_heures + prime_ap_pp + surveillance_secretariat
                           + indemnite_suggestion_admin
 4. Taxe                 = base_taxable × taux de taxe de la période,
@@ -190,10 +191,16 @@ def _calculer_resultat(
     heures_par_semaine_decimal = {s: Decimal(str(heures.get(s, 0.0))) for s in range(1, 6)}
     total_heures_decimal = sum(heures_par_semaine_decimal.values())
 
-    # 2. Gain par heures
-    taux_horaire_decimal = Decimal(enseignant.taux_horaire)
-    gain_heures_decimal = total_heures_decimal * taux_horaire_decimal
-    gain_heures = arrondir_fcfa(gain_heures_decimal)
+    # 2. Gain par heures — ou salaire mensuel fixe d'un permanent, qui le remplace
+    salaire_fixe = getattr(enseignant, "salaire_fixe", None)
+    if enseignant.statut != StatutEnseignant.PERMANENT:
+        salaire_fixe = None
+    if salaire_fixe is not None:
+        gain_heures = int(salaire_fixe)
+    else:
+        taux_horaire_decimal = Decimal(enseignant.taux_horaire)
+        gain_heures_decimal = total_heures_decimal * taux_horaire_decimal
+        gain_heures = arrondir_fcfa(gain_heures_decimal)
 
     prime_ap_pp = int(remuneration.get("prime_ap_pp", 0))
     surveillance_secretariat = int(remuneration.get("surveillance_secretariat", 0))
@@ -230,7 +237,7 @@ def _calculer_resultat(
         prenom=enseignant.prenom,
         sexe=enseignant.sexe,
         statut=enseignant.statut,
-        taux_horaire=enseignant.taux_horaire,
+        taux_horaire=enseignant.taux_horaire or 0,
         semaine_1=float(heures_par_semaine_decimal[1]),
         semaine_2=float(heures_par_semaine_decimal[2]),
         semaine_3=float(heures_par_semaine_decimal[3]),
@@ -247,6 +254,7 @@ def _calculer_resultat(
         dette=dette,
         net_a_percevoir=net_a_percevoir,
         taux_taxe=taux_taxe,
+        salaire_fixe=salaire_fixe,
     )
 
 

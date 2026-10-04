@@ -82,6 +82,9 @@ DEFINITION_BLOCS: Dict[str, List[EntreeNavigation]] = {
     "Paie": [
         EntreeNavigation("Données de paie", _icone("edit_note"), f"{DOSSIER_PAGES}/3_Donnees_Paie.py",
                          permission_service.PAIE_MODIFIER, url_path="donnees-paie"),
+        EntreeNavigation("Import du fichier de paie", _icone("upload_file"),
+                         f"{DOSSIER_PAGES}/23_Import_Fichier_Paie.py",
+                         permission_service.IMPORT_DONNEES, url_path="import-fichier-paie"),
         EntreeNavigation("Calcul de paie", _icone("calculate"), f"{DOSSIER_PAGES}/4_Calcul_Paie.py",
                          permission_service.PAIE_CONSULTER, url_path="calcul-paie"),
         EntreeNavigation("Cycle de paie", _icone("sync_alt"), f"{DOSSIER_PAGES}/11_Cycle_Paie.py",

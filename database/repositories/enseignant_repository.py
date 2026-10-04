@@ -40,12 +40,13 @@ def creer(enseignant: Enseignant, db_path: DbPath = None, conn: "Optional[sqlite
     Sinon, comportement inchangé : ouvre sa propre connexion et commit.
     """
     requete = """
-        INSERT INTO enseignants (nom, prenom, sexe, statut, taux_horaire, email, telephone, adresse, actif)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+        INSERT INTO enseignants (nom, prenom, sexe, statut, taux_horaire, salaire_fixe, email, telephone, adresse, actif)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     """
     parametres = (
         enseignant.nom, enseignant.prenom or "", _valeur(enseignant.sexe), _valeur(enseignant.statut),
-        enseignant.taux_horaire, enseignant.email, enseignant.telephone, enseignant.adresse, enseignant.actif,
+        enseignant.taux_horaire, enseignant.salaire_fixe, enseignant.email, enseignant.telephone,
+        enseignant.adresse, enseignant.actif,
     )
     if conn is not None:
         curseur = conn.execute(requete, parametres)
@@ -140,13 +141,14 @@ def mettre_a_jour(
         raise ValueError("enseignant.id est requis pour une mise à jour.")
     requete = """
         UPDATE enseignants
-        SET nom = ?, prenom = ?, sexe = ?, statut = ?, taux_horaire = ?,
+        SET nom = ?, prenom = ?, sexe = ?, statut = ?, taux_horaire = ?, salaire_fixe = ?,
             email = ?, telephone = ?, adresse = ?
         WHERE id = ?
     """
     parametres = (
         enseignant.nom, enseignant.prenom or "", _valeur(enseignant.sexe), _valeur(enseignant.statut),
-        enseignant.taux_horaire, enseignant.email, enseignant.telephone, enseignant.adresse, enseignant.id,
+        enseignant.taux_horaire, enseignant.salaire_fixe, enseignant.email, enseignant.telephone,
+        enseignant.adresse, enseignant.id,
     )
     if conn is not None:
         conn.execute(requete, parametres)

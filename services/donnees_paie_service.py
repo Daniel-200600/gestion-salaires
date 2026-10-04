@@ -120,6 +120,11 @@ def enregistrer_donnees_paie_groupe(
             conn.commit()
 
 
+def ecrire_donnees_paie(conn, periode_id: int, donnees: DonneesPaieEnseignant) -> None:
+    """Valide puis écrit les données d'un enseignant sur une transaction ouverte par l'appelant (sans commit)."""
+    _traiter_enseignant(conn, periode_id, donnees)
+
+
 def _traiter_enseignant(conn, periode_id: int, donnees: DonneesPaieEnseignant) -> None:
     """
     Valide puis upserte, sur la connexion `conn` de la transaction en

@@ -168,7 +168,7 @@ def _controler_taux_et_montants(resultat: ResultatPaie) -> List[Anomalie]:
     nom = _nom_complet(resultat)
     anomalies: List[Anomalie] = []
 
-    if resultat.taux_horaire <= 0:
+    if resultat.taux_horaire <= 0 and resultat.salaire_fixe is None:  # salaire fixe : pas de taux
         anomalies.append(Anomalie(NiveauAnomalie.ERREUR, "TAUX_INVALIDE", resultat.enseignant_id, nom,
                                    "Le taux horaire est nul ou négatif.", valeur=str(resultat.taux_horaire)))
 

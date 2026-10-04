@@ -51,6 +51,11 @@ CREATE TABLE IF NOT EXISTS enseignants (
     taux_horaire        INTEGER NULL
                             CHECK (taux_horaire IS NULL OR taux_horaire >= 0)
                             CHECK (taux_horaire IS NULL OR taux_horaire = CAST(taux_horaire AS INTEGER)),
+    -- Salaire mensuel fixe d'un permanent (FCFA) : il remplace heures × taux
+    -- horaire dans le calcul ; les heures restent saisies à titre d'information.
+    salaire_fixe        INTEGER NULL
+                            CHECK (salaire_fixe IS NULL OR salaire_fixe >= 0)
+                            CHECK (salaire_fixe IS NULL OR salaire_fixe = CAST(salaire_fixe AS INTEGER)),
     email               TEXT    NULL,
     telephone           TEXT    NULL,
     adresse             TEXT    NULL,

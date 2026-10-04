@@ -25,9 +25,10 @@ def test_exactement_sept_blocs_definis():
     assert len(DEFINITION_BLOCS) == 7
 
 
-def test_dix_sept_pages_reparties_sans_perte():
-    assert len(entrees_fonctionnelles()) == 17
-    assert len(toutes_les_entrees()) == 17 + len(PAGES_DOCUMENTATION)
+def test_dix_huit_pages_reparties_sans_perte():
+    # 17 pages d'origine + « Import du fichier de paie » (version 1.7.0).
+    assert len(entrees_fonctionnelles()) == 18
+    assert len(toutes_les_entrees()) == 18 + len(PAGES_DOCUMENTATION)
 
 
 def test_noms_des_sept_blocs_conformes_au_cahier_des_charges():
@@ -63,7 +64,8 @@ def test_composition_exacte_de_chaque_bloc():
             "À propos",
         ],
         "Gestion": ["Enseignants", "Périodes de paie"],
-        "Paie": ["Données de paie", "Calcul de paie", "Cycle de paie", "Bulletins de solde", "Génération comptable"],
+        "Paie": ["Données de paie", "Import du fichier de paie", "Calcul de paie", "Cycle de paie",
+                 "Bulletins de solde", "Génération comptable"],
         "Contrôle & Historique": ["Contrôle de la paie", "Historique de paie"],
         "Analyse & Rapports": ["Rapports comptables", "Statistiques"],
         "Documents & Opérations": ["Gestion des documents", "Importation", "Notifications", "Automatisation"],
@@ -79,11 +81,11 @@ def test_admin_voit_les_sept_blocs():
     assert len(blocs) == 7
 
 
-def test_admin_voit_les_dix_sept_pages():
+def test_admin_voit_les_dix_huit_pages():
     blocs = construire_blocs_visibles(RoleUtilisateur.ADMIN)
     visibles = [e for entrees in blocs.values() for e in entrees]
-    assert len([e for e in visibles if e.chemin not in PAGES_DOCUMENTATION]) == 17
-    assert len(visibles) == 17 + len(PAGES_DOCUMENTATION)
+    assert len([e for e in visibles if e.chemin not in PAGES_DOCUMENTATION]) == 18
+    assert len(visibles) == 18 + len(PAGES_DOCUMENTATION)
 
 
 def test_consultation_ne_voit_pas_le_bloc_administration():

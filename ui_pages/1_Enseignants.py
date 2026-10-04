@@ -78,13 +78,20 @@ with st.expander("Ajouter un enseignant", expanded=False):
             nom = st.text_input("Nom *")
             sexe_libelle = st.selectbox("Sexe *", OPTIONS_SEXE)
             taux_horaire = st.number_input(
-                "Taux horaire (FCFA) *", min_value=0, step=100, format="%d"
+                "Taux horaire (FCFA)", min_value=0, step=100, format="%d", value=None,
+                placeholder="Obligatoire, sauf salaire fixe",
             )
             email = st.text_input("Email")
 
         with col_droite:
             prenom = st.text_input("Prénom(s) *")
             statut_libelle = st.selectbox("Statut *", OPTIONS_STATUT)
+            salaire_fixe = st.number_input(
+                "Salaire mensuel fixe (FCFA)", min_value=0, step=1000, format="%d", value=None,
+                placeholder="Permanents payés au mois",
+                help="Pour un permanent payé au mois : ce montant remplace heures × taux horaire. "
+                     "Laissez vide pour un paiement à l'heure.",
+            )
             telephone = st.text_input("Téléphone")
             adresse = st.text_input("Adresse")
 
@@ -101,6 +108,7 @@ with st.expander("Ajouter un enseignant", expanded=False):
                     email=email,
                     telephone=telephone,
                     adresse=adresse,
+                    salaire_fixe=salaire_fixe,
                 )
                 st.success(
                     f"Enseignant « {nouvel_enseignant.prenom} {nouvel_enseignant.nom} » ajouté avec succès."
@@ -143,6 +151,7 @@ if fiches_a_completer:
                     "Sexe": libelle_sexe(e.sexe) if e.sexe is not None else None,
                     "Statut": libelle_statut(e.statut) if e.statut is not None else None,
                     "Taux horaire (FCFA)": e.taux_horaire,
+                    "Salaire fixe (FCFA)": e.salaire_fixe,
                 }
                 for e in fiches_a_completer
             ],
@@ -153,6 +162,9 @@ if fiches_a_completer:
                 "Sexe": st.column_config.SelectboxColumn(options=OPTIONS_SEXE),
                 "Statut": st.column_config.SelectboxColumn(options=OPTIONS_STATUT),
                 "Taux horaire (FCFA)": st.column_config.NumberColumn(min_value=0, step=100, format="%d"),
+                "Salaire fixe (FCFA)": st.column_config.NumberColumn(
+                    min_value=0, step=1000, format="%d", help="Permanents payés au mois (remplace le taux horaire).",
+                ),
             },
             hide_index=True, use_container_width=True, disabled=not peut_completer, placeholder="À renseigner",
             key=f"editeur_fiches_{version_editeur}",
@@ -168,6 +180,7 @@ if fiches_a_completer:
                                 sexe=sexe_depuis_libelle(ligne["Sexe"]) if ligne["Sexe"] else None,
                                 statut=statut_depuis_libelle(ligne["Statut"]) if ligne["Statut"] else None,
                                 taux_horaire=ligne["Taux horaire (FCFA)"],
+                                salaire_fixe=ligne["Salaire fixe (FCFA)"],
                             )
                             for ligne in tableau_modifie
                         ],
@@ -223,7 +236,9 @@ else:
             "Prénom": enseignant.prenom,
             "Sexe": libelle_sexe(enseignant.sexe),
             "Statut": libelle_statut(enseignant.statut),
-            "Taux horaire": formater_fcfa(enseignant.taux_horaire),
+            "Rémunération": (f"{formater_fcfa(enseignant.salaire_fixe)} / mois" if enseignant.remuneration_fixe
+                             else f"{formater_fcfa(enseignant.taux_horaire)} / h"
+                             if enseignant.taux_horaire is not None else formater_fcfa(None)),
             "Fiche": "Complète" if enseignant.est_complet else "À compléter : " + ", ".join(enseignant.champs_manquants),
             "État": libelle_actif(enseignant.actif),
         }
@@ -269,6 +284,9 @@ else:
             st.write(f"**Sexe :** {libelle_sexe(enseignant_selectionne.sexe)}")
             st.write(f"**Statut :** {libelle_statut(enseignant_selectionne.statut)}")
             st.write(f"**Taux horaire :** {formater_fcfa(enseignant_selectionne.taux_horaire)}")
+            if enseignant_selectionne.salaire_fixe is not None:
+                st.write(f"**Salaire mensuel fixe :** {formater_fcfa(enseignant_selectionne.salaire_fixe)}"
+                         + ("" if enseignant_selectionne.remuneration_fixe else " (non appliqué : vacataire)"))
         with col_b:
             st.write(f"**Email :** {enseignant_selectionne.email or '—'}")
             st.write(f"**Téléphone :** {enseignant_selectionne.telephone or '—'}")
@@ -299,7 +317,7 @@ else:
                     placeholder="À renseigner",
                 )
                 taux_modifie = st.number_input(
-                    "Taux horaire (FCFA) *",
+                    "Taux horaire (FCFA)",
                     min_value=0,
                     step=100,
                     format="%d",
@@ -317,6 +335,12 @@ else:
                     index=(OPTIONS_STATUT.index(libelle_statut(enseignant_selectionne.statut))
                            if enseignant_selectionne.statut is not None else None),
                     placeholder="À renseigner",
+                )
+                salaire_modifie = st.number_input(
+                    "Salaire mensuel fixe (FCFA)", min_value=0, step=1000, format="%d",
+                    value=enseignant_selectionne.salaire_fixe, placeholder="Paiement à l'heure",
+                    help="Permanents payés au mois : remplace heures × taux horaire. Videz le champ pour "
+                         "revenir à un paiement à l'heure.",
                 )
                 telephone_modifie = st.text_input("Téléphone", value=enseignant_selectionne.telephone or "")
                 adresse_modifiee = st.text_input("Adresse", value=enseignant_selectionne.adresse or "")
@@ -343,6 +367,7 @@ else:
                         telephone=telephone_modifie,
                         adresse=adresse_modifiee,
                         utilisateur=st.session_state.get("username"),
+                        salaire_fixe=salaire_modifie,
                     )
                     st.success("Enseignant modifié avec succès.")
                     st.rerun()

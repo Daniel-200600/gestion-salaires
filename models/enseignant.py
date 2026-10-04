@@ -25,6 +25,8 @@ class Enseignant:
     sexe: Optional[Sexe] = None
     statut: Optional[StatutEnseignant] = None
     taux_horaire: Optional[int] = None  # FCFA entiers
+    # Salaire mensuel fixe (FCFA) d'un permanent : remplace heures × taux horaire.
+    salaire_fixe: Optional[int] = None
 
     id: Optional[int] = None
     email: Optional[str] = None
@@ -42,9 +44,15 @@ class Enseignant:
             manquants.append("sexe")
         if self.statut is None:
             manquants.append("statut")
-        if self.taux_horaire is None:
-            manquants.append("taux horaire")
+        if self.taux_horaire is None and not self.remuneration_fixe:
+            manquants.append("taux horaire ou salaire fixe" if self.statut == StatutEnseignant.PERMANENT
+                             else "taux horaire")
         return manquants
+
+    @property
+    def remuneration_fixe(self) -> bool:
+        """Permanent payé au salaire mensuel fixe (et non à l'heure)."""
+        return self.statut == StatutEnseignant.PERMANENT and self.salaire_fixe is not None
 
     @property
     def est_complet(self) -> bool:
@@ -60,6 +68,7 @@ class Enseignant:
             sexe=Sexe(row["sexe"]) if row["sexe"] else None,
             statut=StatutEnseignant(row["statut"]) if row["statut"] else None,
             taux_horaire=row["taux_horaire"],
+            salaire_fixe=row["salaire_fixe"] if "salaire_fixe" in row.keys() else None,
             email=row["email"],
             telephone=row["telephone"],
             adresse=row["adresse"],

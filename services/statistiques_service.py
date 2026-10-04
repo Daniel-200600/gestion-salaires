@@ -132,7 +132,8 @@ def statistiques_generales(periode_id: int, db_path: DbPath = None) -> Statistiq
         nombre_hommes=sum(1 for e in tous_enseignants if e.sexe == Sexe.HOMME),
         nombre_femmes=sum(1 for e in tous_enseignants if e.sexe == Sexe.FEMME),
         heures=calculer_statistique_descriptive([r.total_heures for r in resultats]),
-        taux_horaire=calculer_statistique_descriptive([r.taux_horaire for r in resultats]),
+        # Les permanents au salaire fixe n'ont pas de taux horaire.
+        taux_horaire=calculer_statistique_descriptive([r.taux_horaire for r in resultats if r.salaire_fixe is None]),
         remuneration_nette=calculer_statistique_descriptive([r.net_a_percevoir for r in resultats]),
         masse_salariale_brute=sum(
             r.gain_heures + r.prime_ap_pp + r.surveillance_secretariat + r.indemnite_suggestion_admin
@@ -251,7 +252,7 @@ def analyser_periodes(periode_ids: List[int], db_path: DbPath = None) -> List[Po
                 periode=etat.periode, nombre_enseignants=len(resultats),
                 heures_totales=etat.totaux.total_heures,
                 taux_horaire_moyen=(
-                    statistics.mean([r.taux_horaire for r in resultats]) if resultats else None
+                    statistics.mean(taux) if (taux := [r.taux_horaire for r in resultats if r.salaire_fixe is None]) else None
                 ),
                 masse_salariale_brute=etat.totaux.total_gain_heures + etat.totaux.total_primes,
                 total_net=etat.totaux.total_net_a_percevoir, total_taxe=etat.totaux.total_taxe,

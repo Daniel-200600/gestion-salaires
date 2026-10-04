@@ -52,6 +52,14 @@ def valider_statut(valeur: Union[str, StatutEnseignant]) -> StatutEnseignant:
         raise EnseignantValidationError("Le statut est invalide : valeurs autorisées 'V' ou 'P'.")
 
 
+def valider_salaire_fixe(valeur) -> int:
+    """Salaire mensuel fixe d'un permanent : montant entier en FCFA, positif ou nul."""
+    try:
+        return valider_taux_horaire(valeur)
+    except EnseignantValidationError as erreur:
+        raise EnseignantValidationError(str(erreur).replace("Le taux horaire", "Le salaire mensuel fixe")) from erreur
+
+
 def valider_taux_horaire(valeur) -> int:
     """
     Valide le taux horaire et le retourne en entier FCFA.
